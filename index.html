@@ -1,0 +1,292 @@
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pakowanie · Etap 2</title><style>
+
+:root{--navy:#123b69;--ink:#152238;--pale:#eef4fb;--line:#cbd8e6;--green:#16825d;--red:#ae3d3d}
+*{box-sizing:border-box}
+body{margin:0;background:#eef3f8;color:var(--ink);font:16px Inter,"Segoe UI",Arial,sans-serif}
+header{background:var(--navy);color:#fff;padding:22px max(24px,calc((100vw - 1280px)/2));font-size:1.5rem;font-weight:700;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap}
+.hright{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sync{font-size:.8rem;font-weight:700;background:#ffffff26;color:#fff;padding:6px 12px;border-radius:15px}
+.hbtn{background:#fff;color:var(--navy);padding:8px 12px;font-size:.85rem}
+.wrap{max-width:1280px;margin:auto;padding:26px 24px}
+.tabs{display:flex;gap:8px;flex-wrap:wrap}
+button,label.file{border:0;border-radius:7px;padding:10px 14px;background:var(--navy);color:#fff;font:inherit;font-weight:800;cursor:pointer;text-align:center;display:inline-block}
+button:hover,label.file:hover{filter:brightness(1.12)}
+.tabs button{background:#e5edf7;color:var(--navy)}
+.tabs button.active{background:var(--navy);color:#fff}
+section{display:none;margin-top:18px}.show{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.card,.panel{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 6px 20px #17395b12}
+.grid .card{margin-bottom:0;background:var(--pale);box-shadow:none;border-radius:9px;padding:12px 14px}
+.panel h3,.panel h4{margin:0 0 14px;font-size:1.1rem}
+.metric{font-size:.68rem;font-weight:800;color:#60738a;letter-spacing:.04em;text-transform:uppercase}
+.metric b{display:block;margin-top:4px;font-size:1.5rem;letter-spacing:0;color:var(--navy);text-transform:none}
+label{display:block;margin:10px 0 5px;font-size:.75rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase}
+.grid label{margin:0}
+label.file{text-transform:none;font-size:inherit;letter-spacing:0;margin:0}
+input,select,textarea{width:100%;margin:5px 0 8px;padding:10px;background:#fff;color:var(--ink);border:1px solid #b8c6d7;border-radius:7px;font:inherit;font-weight:400;letter-spacing:0;text-transform:none}
+input:focus,select:focus,textarea:focus{outline:2px solid #123b6933;border-color:var(--navy)}
+input[readonly]{background:var(--pale)}
+textarea{height:70px}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:.82rem;border:1px solid var(--line)}
+td,th{border:1px solid var(--line);padding:8px;text-align:left}
+th{background:var(--navy);color:#fff;font-size:.75rem;letter-spacing:.04em}
+tr:nth-child(even) td{background:#f6f9fc}
+td button{padding:5px 9px;font-size:.75rem;margin-right:4px}
+.progress{height:18px;background:#e3eef9;border-radius:9px;overflow:hidden;margin-bottom:10px}
+.progress i{display:block;background:var(--green);height:100%}
+.hint{color:#64748b;font-size:.85rem}.danger{background:var(--red)}.ok{background:var(--green)}.warn{color:var(--red);font-weight:700}
+label.file input{display:none}
+.xs{overflow-x:auto}
+@media(max-width:900px){.wrap{padding:16px}header{font-size:1.2rem}.tabs button{flex:1 1 140px}}
+#auth{position:fixed;inset:0;z-index:99;background:#eef3f8;display:none;align-items:center;justify-content:center;padding:16px}#auth .panel{max-width:460px;width:100%;margin:0}
+
+.bad{color:var(--red);font-weight:700}.good{color:var(--green);font-weight:700}
+.sync.x{background:#ffffff1a}
+</style></head><body>
+<header><span id="appTitle"></span><span class="hright"><span id="sync" class="sync">Status: ...</span><span id="xSt" class="sync x">WIP: ...</span><button class="hbtn" onclick="pull(true);refreshX()">🔄 Odśwież z chmury</button><span id="userBar"></span></span></header>
+<main class="wrap"><div class="tabs">
+<button id="tb_entry" onclick="tab('entry',this)">Pakowanie</button><button id="tb_wip" onclick="tab('wip',this)">Bufory WIP</button><button id="tb_summary" onclick="tab('summary',this)">Podsumowanie</button><button id="tb_config" onclick="tab('config',this)">Konfiguracja</button><button id="tb_data" onclick="tab('data',this)">Import / eksport</button><button id="tb_log" onclick="tab('log',this)">Log</button></div>
+
+<section id="entry" class="show">
+<div class="panel"><h3>⏳ Do spakowania (WIP 1) – wg zleceń</h3>
+<div class="grid"><label>Szukaj zlecenia<input id="qQ" oninput="renderQueue()" placeholder="np. JOQ-1"></label></div>
+<p id="xInfo" class="hint"></p><div id="queue" class="xs"></div>
+<p class="hint">Dostępne do pakowania = suma wykonanych na Rolsiarce (wszystkie wpisy zlecenia) − już spakowane − braki pakowania.</p></div>
+<div class="panel"><h3>Dodaj pozycję pakowania</h3>
+<div class="grid"><label>Zlecenie<select id="order" onchange="orderInfo()"></select></label><label>Data pakowania<input id="day" type="date"></label><label>Zmiana<select id="shift"><option>1</option><option>2</option><option>3</option></select></label><label>Ilość osób<input id="people" type="number" min="1" max="10" value="1" oninput="empFields()"></label><label>Pakowacz 1<select id="employee"></select></label><span id="empExtra" style="display:contents"></span></div>
+<div id="orderBox" style="margin:12px 0"></div>
+<div class="grid"><label>Spakowano [szt.]<input id="packed" type="number" min="0" value="0" oninput="orderInfo()"></label><label>Odpady / braki [szt.] (opcjonalnie)<input id="pwaste" type="number" min="0" value="0" oninput="orderInfo()"></label></div>
+<p id="after" class="hint"></p>
+<label>Uwagi<textarea id="notes"></textarea></label><p id="entryErr" class="warn"></p><p id="entryOk" class="good"></p>
+<button class="ok" onclick="addEntry()">➕ Dodaj pozycję i przekaż do Klejenia (WIP 2)</button></div>
+<div class="panel"><h3>Historia pakowania</h3><div class="grid"><label>Szukaj<input id="fQ" oninput="fPage=100;renderHist()" placeholder="zlecenie, osoba, uwagi…"></label><label>Zlecenie<select id="fO" onchange="fPage=100;renderHist()"></select></label><label>Pracownik<select id="fE" onchange="fPage=100;renderHist()"></select></label><label>Od<input id="fF" type="date" onchange="fPage=100;renderHist()"></label><label>Do<input id="fT" type="date" onchange="fPage=100;renderHist()"></label></div>
+<button onclick="clrF()">Wyczyść filtry</button> <span id="fInfo" class="hint"></span><div id="entries" class="xs"></div></div></section>
+
+<section id="wip"><div class="panel"><h3>Bufory pomiędzy etapami (WIP)</h3><p id="wipSrc" class="hint"></p><div id="wipTiles"></div>
+<div id="wipTable" class="xs"></div><div id="wipDisc" class="xs"></div>
+<p class="hint"><b>WIP 1</b> (czeka na pakowanie) = wyprodukowane w Etapie 1 − spakowane − braki pakowania. <b>WIP 2</b> (czeka na klejenie) = spakowane w Etapie 2 − pobrane do Klejenia (wykonano + odrzucone rolki). Dane Rolsiarki i Klejenia są pobierane tylko do odczytu, co 60 s i przy każdym zapisie.</p></div></section>
+
+<section id="summary"><div class="panel"><h3>Podsumowanie pakowania</h3><div class="grid"><label>Od<input id="sF" type="date" onchange="renderSummary()"></label><label>Do<input id="sT" type="date" onchange="renderSummary()"></label></div><br><div id="stats"></div>
+<h4 style="margin:18px 0 0">Wg zleceń</h4><div id="sumOrders" class="xs"></div><h4 style="margin:18px 0 0">Wg pracowników</h4><div id="sumEmps" class="xs"></div><br><button onclick="exportCsv()">⬇ Eksport CSV (wybrany okres)</button></div></section>
+
+<section id="config"><div class="panel"><h3>Produkcja i wartości domyślne</h3><div class="grid"><label>Pracownicy (po przecinku)<input id="cfgEmployees"></label><label>Domyślna zmiana<select id="cfgShift"><option>1</option><option>2</option><option>3</option></select></label><label>Domyślna ilość osób<input id="cfgPeople" type="number" min="1"></label><label>Auto-wylogowanie po [min] (0 = wyłączone)<input id="cfgIdle" type="number" min="0"></label></div></div>
+<div class="panel"><h3>Użytkownicy i role</h3><div id="usersBox"></div><div class="grid"><label>Nazwa<input id="nuN"></label><label>Rola<select id="nuR"><option value="operator">Operator</option><option value="owner">Właściciel</option><option value="admin">Administrator</option></select></label><label>PIN tymczasowy (4–8 cyfr)<input id="nuP" type="password" inputmode="numeric" maxlength="8"></label></div><button onclick="addUser()">➕ Dodaj użytkownika</button>
+<p class="hint"><b>Uprawnienia:</b> Administrator – wszystko. Właściciel – wpisy (dodawanie, edycja, usuwanie), bufory WIP, podsumowania i eksport. Operator – tylko dodawanie wpisów pakowania. Użytkownicy Etapu 2 są niezależni od użytkowników Etapów 1 i 3.</p></div>
+<button onclick="saveConfig()">Zapisz konfigurację</button></section>
+
+<section id="data"><div class="panel"><h3>Przenoszenie danych</h3><button onclick="pull(true)">🔄 Odśwież z chmury</button> <button onclick="download()">⬇ Eksportuj JSON</button> <label class="file">⬆ Importuj JSON<input type="file" accept="application/json" onchange="upload(this)"></label><p class="hint">Dane synchronizują się z chmurą (Supabase, funkcja pakowanie-sync) po każdej zmianie, a kopia lokalna działa awaryjnie, gdy nie ma sieci. Import JSON zastępuje dane lokalne i w chmurze.</p><p id="last" class="hint"></p></div></section>
+
+<section id="log"><div class="panel"><h3>Dziennik zdarzeń</h3><div class="grid"><label>Szukaj<input id="lQ" oninput="renderLog()"></label><label>Użytkownik<select id="lU" onchange="renderLog()"></select></label><label>Zdarzenie<select id="lA" onchange="renderLog()"></select></label><label>Od<input id="lF" type="date" onchange="renderLog()"></label><label>Do<input id="lT" type="date" onchange="renderLog()"></label></div><div id="logList" class="xs"></div><p class="hint">Log jest tylko do odczytu (ostatnie 3000 zdarzeń).</p></div></section>
+</main><div id="auth"></div>
+
+<div id="editModal" class="wrap" style="display:none"><div class="panel"><h3>✏️ Edycja wpisu pakowania</h3><div class="grid">
+<label>Data<input id="eDate" type="date"></label><label>Zlecenie<input id="eSrc" readonly></label><label>Zmiana<select id="eShift"><option>1</option><option>2</option><option>3</option></select></label><label>Ilość osób<input id="ePeople" type="number" min="1" max="10" oninput="empFields(true)"></label><label>Pracownik 1<select id="eEmployee"></select></label><span id="eEmpExtra" style="display:contents"></span>
+<label>Spakowano [szt.]<input id="ePacked" type="number" min="0"></label><label>Odpady / braki [szt.]<input id="eWaste" type="number" min="0"></label></div>
+<label>Uwagi<textarea id="eNotes"></textarea></label><button class="ok" onclick="saveEdit()">💾 Zapisz zmiany</button> <button onclick="cancelEdit()">Anuluj</button></div></div>
+<script>
+const APP_VERSION='1.1',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
+const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>ymd(new Date());
+const fdate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?m[3]+'.'+m[2]+'.'+m[1]:(d||'—')};
+const hhmm=t=>{if(!t)return'—';const n=new Date(t),p=v=>String(v).padStart(2,'0');return p(n.getHours())+':'+p(n.getMinutes())};
+const def={employees:['Operator'],shift:'1',people:1,idleMin:30};
+let state=JSON.parse(localStorage.getItem(LS)||'{}');
+['entries','deletedEntries','users','log','deletedUsers'].forEach(k=>state[k]??=[]);
+state.cfgUpdated??=0;state.lastModified??='—';state.cfg={...def,...(state.cfg||{})};
+const saveLocal=()=>localStorage.setItem(LS,JSON.stringify(state)),save=()=>{saveLocal();push()};
+const newUid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
+function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return(h>>>0).toString(36)}
+function ensureUid(e){if(!e.uid)e.uid='h'+hash(JSON.stringify(e));e.updated??=0;return e.uid}
+const stamp=()=>{const n=new Date(),p=v=>String(v).padStart(2,'0');return p(n.getHours())+':'+p(n.getMinutes())+' ('+p(n.getDate())+'.'+p(n.getMonth()+1)+')'};
+const setSync=t=>{$('sync').textContent='Status: '+t;$('last').textContent='Ostatnia zmiana: '+(state.lastModified||'—')};
+const sum=(a,k)=>a.reduce((s,x)=>s+(+x[k]||0),0),list=v=>v.split(',').map(x=>x.trim()).filter(Boolean);
+
+/* ===== synchronizacja z Supabase (funkcja pakowanie-sync) ===== */
+function pack(cl=true){return{format:'system-produkcji/pakowanie',version:1,app_version:APP_VERSION,exported_at:new Date().toISOString(),data:{entries:state.entries,settings:{employees:state.cfg.employees,default_shift:state.cfg.shift,default_people:state.cfg.people,idle_min:state.cfg.idleMin}},sync:{...(cl?{users:state.users,log:state.log,deleted_users:state.deletedUsers}:{}),deleted_entries:state.deletedEntries,cfg_updated:state.cfgUpdated,last_modified:state.lastModified}}}
+function unpack(p){const d=p.data||p,s=d.settings||{},y=p.sync||{};return{entries:d.entries||[],cfg:{employees:s.employees||def.employees,shift:String(s.default_shift||'1'),people:+s.default_people||1,idleMin:s.idle_min??30},users:y.users||[],log:y.log||[],deletedUsers:y.deleted_users||[],deletedEntries:y.deleted_entries||[],cfgUpdated:y.cfg_updated||0,lastModified:y.last_modified||'—',hasSettings:!!d.settings}}
+async function getCloud(){const res=await fetch(API_URL+'?nocache='+Date.now(),{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);const p=await res.json();return unpack(p&&typeof p==='object'?p:{})}
+const latest=(a,b,key)=>{const m=new Map();[...a,...b].forEach(x=>{const k=key(x),o=m.get(k);if(!o||(+x.updated||0)>(+o.updated||0))m.set(k,x)});return[...m.values()]};
+function merge(r){const de=new Set([...state.deletedEntries,...r.deletedEntries]),du=new Set([...state.deletedUsers,...r.deletedUsers]);
+ state.deletedEntries=[...de];state.deletedUsers=[...du];
+ state.entries=latest(state.entries,r.entries,ensureUid).filter(e=>!de.has(e.uid)).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(+a.created||0)-(+b.created||0));
+ state.users=latest(state.users,r.users,u=>u.id).filter(u=>!du.has(u.id));
+ state.log=[...new Map([...state.log,...r.log].map(l=>[l.id,l])).values()].sort((a,b)=>a.ts-b.ts).slice(-3000);
+ if(r.cfgUpdated>state.cfgUpdated||(r.cfgUpdated===state.cfgUpdated&&!state.cfgUpdated&&r.hasSettings)){state.cfg={...def,...r.cfg};state.cfgUpdated=r.cfgUpdated}}
+function mergeChanged(r){const k=()=>JSON.stringify([state.entries,state.cfg,state.users,state.log.length]),b=k();merge(r);const ch=b!==k();if(ch&&r.lastModified&&r.lastModified!=='—')state.lastModified=r.lastModified;return ch}
+function needPush(r){const rl=new Set(r.log.map(l=>l.id)),rus=new Map(r.users.map(u=>[u.id,+u.updated||0])),ru=new Set(r.entries.map(ensureUid));
+ return state.entries.some(e=>!ru.has(ensureUid(e)))||state.deletedEntries.some(u=>!r.deletedEntries.includes(u))||state.cfgUpdated>r.cfgUpdated||state.log.some(l=>!rl.has(l.id))||state.users.some(u=>(rus.get(u.id)??-1)<(+u.updated||0))||state.deletedUsers.some(i=>!r.deletedUsers.includes(i))}
+let busy=false,again=false;
+async function push(force){if(busy){again=true;return}busy=true;setSync('Zapisywanie w chmurze...');try{if(!force){if(mergeChanged(await getCloud()))render()}state.lastModified=stamp();saveLocal();const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pack())});setSync(res.ok?'Zapisano w chmurze':'API odrzuciło zapis (HTTP '+res.status+')')}catch(e){setSync('Zapisano lokalnie (brak sieci)')}busy=false;if(again){again=false;push()}}
+async function pull(show){setSync('Pobieranie z chmury...');try{const r=await getCloud(),need=needPush(r),ch=mergeChanged(r);saveLocal();if(ch)render();if(need)await push();else setSync('Gotowy');if(show)alert('Pobrano najnowsze dane z chmury.')}catch(e){setSync('Praca lokalna (brak sieci)');if(show)alert('Nie udało się połączyć z chmurą.')}}
+function dl(text,name,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
+function download(){logEv('Eksport JSON','pełna kopia danych');save();dl(JSON.stringify(pack(false),null,2),'pakowanie.json','application/json')}
+function upload(el){const r=new FileReader;r.onload=async()=>{try{const u=unpack(JSON.parse(r.result));if(!confirm('Import zastąpi dane lokalne i w chmurze. Kontynuować?'))return;const old=[...state.entries];try{const c=await getCloud();old.push(...c.entries)}catch(_){}
+ const keep=new Set(u.entries.map(ensureUid));state.entries=u.entries;state.cfg={...def,...u.cfg};state.cfgUpdated=Date.now();state.deletedEntries=[...new Set(old.map(ensureUid))].filter(x=>!keep.has(x));logEv('Import danych','JSON: '+u.entries.length+' wpisów');saveLocal();render();await push(true);alert('Zaimportowano dane.')}catch(e){alert('Błędny plik JSON: '+e.message)}};r.readAsText(el.files[0])}
+
+/* ===== WIP: odczyt (tylko do odczytu) Etapu 1 – Rolsiarka i Etapu 3 – Klejenie ===== */
+let X=JSON.parse(localStorage.getItem(LSX)||'null')||{roll:null,glue:null,rollAt:0,glueAt:0,err:[]},xBusy=false;
+const setX=t=>{const e=$('xSt');if(e)e.textContent='WIP: '+t};
+async function fj(url){const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);try{const r=await fetch(url+'?nocache='+Date.now(),{cache:'no-store',signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
+const normRoll=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||('h'+hash(JSON.stringify(e))),date:e.date||'',order:e.order||'',machine:e.machine||'',bobbin:e.bobbin_index||'',shift:e.shift||'',employee:e.employee||'',paper:e.paper||'',produced:+e.produced||0})),orders:(d.orders||[]).map(o=>({name:o.name,target:+o.target||0}))}};
+const normGlue=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||'',date:e.date||'',order:e.order||'',produced:+e.produced||0,rejected:+e.rolls_rejected||0,wip:!!e.wip}))}};
+async function refreshX(){if(xBusy)return;xBusy=true;setX('pobieranie…');const er=[],[a,b]=await Promise.allSettled([fj(ROLL_URL),fj(GLUE_URL)]);
+ try{if(a.status!=='fulfilled')throw 0;X.roll=normRoll(a.value);X.rollAt=Date.now()}catch(e){er.push('Rolsiarka')}
+ try{if(b.status!=='fulfilled')throw 0;X.glue=normGlue(b.value);X.glueAt=Date.now()}catch(e){er.push('Klejenie')}
+ X.err=er;try{localStorage.setItem(LSX,JSON.stringify(X))}catch(_){}
+ setX(er.length?'brak połączenia ('+er.join(', ')+')'+(X.roll?' – dane z '+hhmm(X.rollAt):' – brak danych'):'aktualne '+hhmm(Date.now()));xBusy=false;render()}
+const code=uid=>'R-'+hash(String(uid)).toUpperCase().slice(-5).padStart(5,'0');
+const lbl=r=>`${r.code} · ${r.order} · ${fdate(r.date)} · ${r.machine||'—'} · bob. ${r.bobbin||'—'} · wyk. ${r.produced}`;
+/* Model buforów (na poziomie ZLECENIA): WIP1 = suma wykonanych (Etap 1) − spakowane − braki pakowania; WIP2 = spakowane − pobrane do Klejenia (wykonano + odrzucone rolki) */
+function model(){const R=X.roll?.entries||[],ro=new Map(R.map(r=>[r.uid,r])),ord={},O=n=>ord[n]??={name:n,target:0,roll:0,packed:0,waste:0,wip1:0,over:0,glued:0,rejected:0,legacy:0};
+ R.forEach(r=>{if(r.produced>0)O(r.order).roll+=r.produced});
+ state.entries.forEach(p=>{const o=O(ro.get(p.src_uid)?.order||p.src_order||'?');o.packed+=+p.packed||0;o.waste+=+p.waste||0});
+ (X.glue?.entries||[]).forEach(e=>{const o=O(e.order);if(e.wip){o.glued+=e.produced;o.rejected+=e.rejected}else o.legacy++});
+ (X.roll?.orders||[]).forEach(q=>{if(ord[q.name])ord[q.name].target=q.target});
+ Object.values(ord).forEach(o=>{const l=o.roll-o.packed-o.waste;o.wip1=Math.max(l,0);o.over=Math.max(-l,0);o.wip2=o.packed-o.glued-o.rejected});
+ return{ord,ro}}
+const ordOf=(x,M=model())=>M.ro.get(x.src_uid)?.order||x.src_order||'?';
+
+/* ===== logowanie, role, log ===== */
+let synced=false,curView='',pinOpen=0,first=1,applyDef=true,fPage=100,editIndex=null,fails=JSON.parse(localStorage.pakLock||'{}');
+const ROLES={admin:'Administrator',owner:'Właściciel',operator:'Operator'},
+PERMS={admin:'entry.add entry.edit entry.delete order.manage summary export config data log override'.split(' '),owner:'entry.add entry.edit entry.delete order.manage summary export override'.split(' '),operator:['entry.add']},
+TABS={entry:'entry.add',wip:'summary',summary:'summary',config:'config',data:'data',log:'log'};
+const me=()=>state.users.find(u=>u.id===sessionStorage.pakU),can=p=>!!me()&&PERMS[me().role].includes(p),denied=()=>alert('Brak uprawnień do tej operacji.');
+const eDesc=x=>`${x.date} · ${x.src_order||'?'} · zm.${x.shift} · ${empList(x).join(', ')} · osób ${x.people} · spak. ${x.packed}, braki ${x.waste}`;
+function logEv(act,d,uname){const u=me();state.log.push({id:newUid(),ts:Date.now(),user:uname||(u?u.name:'—'),role:u?u.role:'',act,d:d||''});if(state.log.length>3000)state.log.splice(0,state.log.length-3000)}
+const enc=new TextEncoder();
+async function hp(pin,salt){try{const k=await crypto.subtle.importKey('raw',enc.encode(pin),'PBKDF2',false,['deriveBits']),b=await crypto.subtle.deriveBits({name:'PBKDF2',salt:enc.encode(salt),iterations:120000,hash:'SHA-256'},k,256);return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')}catch(e){return'x'+hash(salt+pin+salt)}}
+async function mkUser(name,role,pin,must){const salt=newUid();return{id:newUid(),name,role,salt,hash:await hp(pin,salt),must,updated:Date.now()}}
+const weak=p=>!/^\d{4,8}$/.test(p)?'PIN musi składać się z 4–8 cyfr.':(/^(\d)\1+$/.test(p)||'01234567890123'.includes(p)||'98765432109876'.includes(p))?'Zbyt prosty PIN (np. 1234, 0000). Wybierz inny.':'';
+function setView(n,h){const a=$('auth');a.style.display='flex';if(curView!==n){a.innerHTML=h;curView=n}}
+const pinIn=id=>`<input id="${id}" type="password" inputmode="numeric" maxlength="8" autocomplete="off">`;
+function gate(){if(!synced&&!state.users.length){setView('load','<div class="panel">Ładowanie danych…</div>');return false}
+ if(!state.users.length){setView('setup',`<div class="panel"><h3>🔐 Pierwsze uruchomienie – utwórz Administratora</h3><p class="hint"><b>Jak ustawić PIN:</b> wpisz 4–8 cyfr, które zapamiętasz (nie 1234, 0000 ani data urodzenia) – PIN-u nie da się odczytać, tylko zresetować (zrobi to inny Administrator). Kolejne osoby dodasz w <b>Konfiguracja → Użytkownicy i role</b>.</p><label>Imię / nazwa<input id="suN"></label><label>PIN${pinIn('suP')}</label><label>Powtórz PIN${pinIn('suP2')}</label><p id="authErr" class="warn"></p><button onclick="doSetup()">Utwórz konto Administratora</button></div>`);return false}
+ if(!me()){setView('login',`<div class="panel"><h3>🔐 Logowanie</h3><label>Użytkownik<select id="lgU">${state.users.map(u=>`<option value="${u.id}">${esc(u.name)} (${ROLES[u.role]})</option>`).join('')}</select></label><label>PIN<input id="lgP" type="password" inputmode="numeric" maxlength="8" onkeydown="if(event.key==='Enter')doLogin()"></label><p id="authErr" class="warn"></p><button onclick="doLogin()">Zaloguj</button></div>`);return false}
+ if(me().must||pinOpen){const f=me().must;setView('pin',`<div class="panel"><h3>🔑 ${f?'Ustaw własny PIN':'Zmień PIN'}</h3><p class="hint">${f?'Twój PIN jest tymczasowy (ustawił go Administrator). ':''}Nowy PIN: 4–8 cyfr, nie 1234 / 0000.</p><label>Obecny PIN${pinIn('pcO')}</label><label>Nowy PIN${pinIn('pcN')}</label><label>Powtórz nowy PIN${pinIn('pcN2')}</label><p id="authErr" class="warn"></p><button onclick="doPin()">Zapisz</button> ${f?'<button onclick="logout()">Wyloguj</button>':'<button onclick="pinOpen=0;curView=\'\';render()">Anuluj</button>'}</div>`);return false}
+ $('auth').style.display='none';return true}
+async function doSetup(){const n=$('suN').value.trim(),p=$('suP').value,e=!n?'Podaj nazwę.':weak(p)||(p!==$('suP2').value?'PIN-y nie są identyczne.':'');if(e)return $('authErr').textContent=e;const u=await mkUser(n,'admin',p,false);state.users.push(u);sessionStorage.pakU=u.id;logEv('Utworzono Administratora',n);save();curView='';first=1;applyDef=true;render()}
+async function doLogin(){const u=state.users.find(x=>x.id===$('lgU').value),f=fails[u.id]||{n:0,t:0};if(Date.now()<f.t)return $('authErr').textContent='Zbyt wiele prób. Odczekaj '+Math.ceil((f.t-Date.now())/1000)+' s.';
+ if(await hp($('lgP').value,u.salt)===u.hash){delete fails[u.id];localStorage.pakLock=JSON.stringify(fails);sessionStorage.pakU=u.id;logEv('Logowanie');save();curView='';first=1;applyDef=true;render()}
+ else{f.n++;if(f.n>=5){f.t=Date.now()+6e4;f.n=0}fails[u.id]=f;localStorage.pakLock=JSON.stringify(fails);logEv('Błędne logowanie',u.name,u.name);saveLocal();$('authErr').textContent='Błędny PIN.'}}
+async function doPin(){const u=me(),n=$('pcN').value,e=await hp($('pcO').value,u.salt)!==u.hash?'Obecny PIN jest błędny.':weak(n)||(n!==$('pcN2').value?'PIN-y nie są identyczne.':'');if(e)return $('authErr').textContent=e;u.salt=newUid();u.hash=await hp(n,u.salt);u.must=false;u.updated=Date.now();logEv('Zmiana PIN-u');save();pinOpen=0;curView='';render()}
+function logout(auto){logEv(auto?'Wylogowanie (bezczynność)':'Wylogowanie');save();delete sessionStorage.pakU;pinOpen=0;curView='';render()}
+let idleT;const idleReset=()=>{clearTimeout(idleT);const m=+state.cfg.idleMin;if(m>0&&me())idleT=setTimeout(()=>logout(true),m*6e4)};['click','keydown','touchstart'].forEach(e=>addEventListener(e,idleReset));
+function usersHtml(){return'<table><tr><th>Użytkownik</th><th>Rola</th><th></th></tr>'+state.users.map(u=>`<tr><td>${esc(u.name)}${u.must?' <span class="hint">(PIN tymczasowy)</span>':''}</td><td><select onchange="setRole('${u.id}',this.value)">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${k===u.role?'selected':''}>${v}</option>`).join('')}</select></td><td><button onclick="resetPin('${u.id}')">Reset PIN</button><button class="danger" onclick="delUser('${u.id}')">Usuń</button></td></tr>`).join('')+'</table>'}
+const nAdm=()=>state.users.filter(x=>x.role==='admin').length;
+async function addUser(){const n=$('nuN').value.trim(),p=$('nuP').value,r=$('nuR').value,e=!n?'Podaj nazwę.':state.users.some(u=>u.name.toLowerCase()===n.toLowerCase())?'Taki użytkownik już istnieje.':weak(p);if(e)return alert(e);state.users.push(await mkUser(n,r,p,true));logEv('Użytkownik: dodano',n+' ('+ROLES[r]+')');$('nuN').value=$('nuP').value='';save();render()}
+function setRole(id,r){const u=state.users.find(x=>x.id===id);if(u.role==='admin'&&r!=='admin'&&nAdm()<2){alert('Musi pozostać co najmniej jeden Administrator.');return render()}logEv('Użytkownik: zmiana roli',u.name+': '+ROLES[u.role]+' → '+ROLES[r]);u.role=r;u.updated=Date.now();save();render()}
+async function resetPin(id){const u=state.users.find(x=>x.id===id),p=prompt('Nowy PIN tymczasowy dla '+u.name+' (4–8 cyfr):');if(p===null)return;const e=weak(p);if(e)return alert(e);u.salt=newUid();u.hash=await hp(p,u.salt);u.must=true;u.updated=Date.now();logEv('Użytkownik: reset PIN',u.name);save();render()}
+function delUser(id){const u=state.users.find(x=>x.id===id);if(u.id===me().id)return alert('Nie możesz usunąć własnego konta.');if(u.role==='admin'&&nAdm()<2)return alert('Musi pozostać co najmniej jeden Administrator.');if(!confirm('Usunąć użytkownika '+u.name+'?'))return;logEv('Użytkownik: usunięto',u.name);state.deletedUsers.push(u.id);state.users=state.users.filter(x=>x.id!==id);save();render()}
+
+
+/* ===== pracownicy we wpisie (1 pole na każdą osobę) ===== */
+const MAXP=10,empList=x=>x.employees&&x.employees.length?x.employees:[x.employee];
+const empOpts=(sel,extra=[])=>[...new Set([...state.cfg.employees,...extra])].map(e=>`<option ${e===sel?'selected':''}>${esc(e)}</option>`).join('');
+function empFields(e,vals){const f=e?'eEmployee':'employee',box=$(e?'eEmpExtra':'empExtra'),n=Math.min(MAXP,Math.max(1,parseInt($(e?'ePeople':'people').value)||1)),old=vals||[...box.querySelectorAll('select')].map(s=>s.value),emp=state.cfg.employees;
+ box.innerHTML=Array.from({length:n-1},(_,k)=>{const i=k+2,v=old[k]||emp[i-1]||emp[0];return`<label>Pracownik ${i}<select id="${f}${i}">${empOpts(v,e?[v]:[])}</select></label>`}).join('')}
+const getEmps=e=>[$(e?'eEmployee':'employee').value,...[...$(e?'eEmpExtra':'empExtra').querySelectorAll('select')].map(s=>s.value)];
+const empErr=(e,n)=>{const l=getEmps(e);return n>MAXP?'Maksymalnie '+MAXP+' osób.':l.some(v=>!v)?'Wybierz wszystkich pracowników.':new Set(l).size<l.length?'Ten sam pracownik jest wybrany więcej niż raz (dodaj brakujących w Konfiguracji).':''};
+const tiles=a=>'<div class="grid">'+a.map(z=>`<div class="card metric">${z[0]}<b>${z[1]}</b></div>`).join('')+'</div>';
+const shifts=es=>new Set(es.map(x=>x.date+'|'+x.shift)).size;
+const fill=(id,v)=>{const c=$(id).value;$(id).innerHTML='<option value="">Wszystkie</option>'+[...new Set(v.filter(Boolean))].sort().map(x=>`<option ${x===c?'selected':''}>${esc(x)}</option>`).join('')};
+
+/* ===== Etap 2: pakowanie na poziomie zlecenia ===== */
+function orderInfo(M=model()){const o=M.ord[$('order').value],b=$('orderBox');
+ if(!o){b.innerHTML='<p class="hint">Wybierz zlecenie z listy.</p>';$('after').textContent='';return}
+ const p=+$('packed').value||0,w=+$('pwaste').value||0,left=o.roll-o.packed-o.waste-p-w;
+ b.innerHTML=tiles([...(o.target?[['Cel zlecenia',o.target]]:[]),['Zrobiono na Rolsiarce',o.roll],['Już spakowano',o.packed],['Braki dotychczas',o.waste],['Zostało do spakowania',o.wip1]]);
+ $('after').innerHTML=`Po dodaniu pozycji do Klejenia (WIP 2) trafi <b>+${p}</b> szt.; do spakowania zostanie <b class="${left<0?'bad':''}">${left}</b> szt.`+(left<0?' — <span class="bad">przekroczono dostępną ilość!</span>':'')}
+function pick(name){const s=$('order');if(![...s.options].some(o=>o.value===name))return;s.value=name;orderInfo();$('packed').focus();s.scrollIntoView({behavior:'smooth',block:'center'})}
+function renderQueue(M=model()){const q=$('qQ').value.toLowerCase().trim(),ad=can('entry.add'),
+ L=Object.values(M.ord).filter(o=>o.wip1>0&&(!q||o.name.toLowerCase().includes(q))).sort((a,b)=>a.name.localeCompare(b.name));
+ $('xInfo').innerHTML=X.roll?`Zleceń do pakowania: <b>${L.length}</b>, łącznie <b>${sum(L,'wip1')}</b> szt. · dane z Rolsiarki: ${hhmm(X.rollAt)}${X.err.includes('Rolsiarka')?' <span class="bad">⚠ brak połączenia – dane z pamięci podręcznej</span>':''}`:'<span class="bad">⚠ Brak danych z Rolsiarki – sprawdź połączenie i kliknij „Odśwież z chmury”.</span>';
+ $('queue').innerHTML=L.length?'<table><tr><th>Zlecenie</th><th>Cel</th><th>Zrobiono (Rolsiarka)</th><th>Spakowano</th><th>Braki</th><th>Do spakowania</th>'+(ad?'<th></th>':'')+'</tr>'+L.map(o=>`<tr><td><b>${esc(o.name)}</b></td><td>${o.target||'—'}</td><td>${o.roll}</td><td>${o.packed}</td><td>${o.waste}</td><td><b>${o.wip1}</b></td>${ad?`<td><button onclick="pick('${esc(o.name)}')">Pakuj ▶</button></td>`:''}</tr>`).join('')+'</table>':'<p class="hint">Brak zleceń oczekujących na pakowanie.</p>'}
+let addBusy=false;
+function vEntry(M){const E=[],W=[],t=today(),d=$('day').value||t,o=M.ord[$('order').value],n=k=>+$(k).value;
+ if(!X.roll)E.push('Brak danych z Rolsiarki (WIP 1) – połącz się z chmurą i odśwież.');
+ if(!o)E.push('Wybierz zlecenie.');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||isNaN(Date.parse(d)))E.push('Nieprawidłowa data.');else if(d>t)E.push('Data nie może być z przyszłości.');else if((Date.parse(t)-Date.parse(d))/864e5>7)W.push('Data wpisu jest starsza niż 7 dni ('+fdate(d)+').');
+ {const m=empErr(false,n('people'));if(m)E.push(m)}
+ if(!Number.isInteger(n('people'))||n('people')<1)E.push('„Ilość osób” musi być liczbą całkowitą ≥ 1.');
+ [['packed','Spakowano'],['pwaste','Odpady / braki']].forEach(([k,l])=>{if(!Number.isInteger(n(k))||n(k)<0)E.push('„'+l+'” musi być liczbą całkowitą ≥ 0.')});
+ if(!E.length){if(!n('packed')&&!n('pwaste'))E.push('Wpis bez ilości – podaj liczbę spakowanych sztuk lub braków.');
+  else{const over=n('packed')+n('pwaste')-o.wip1;if(over>0)(can('override')?W:E).push('Spakowano + braki przekracza ilość dostępną z Rolsiarki o '+over+' szt. (dostępne: '+o.wip1+').');
+   if(X.err.includes('Rolsiarka'))W.push('Brak połączenia z Rolsiarką – ilość dostępna liczona z pamięci podręcznej ('+hhmm(X.rollAt)+').');
+   if(state.entries.some(x=>ordOf(x,M)===o.name&&x.date===d&&x.shift===$('shift').value&&empList(x).join()===getEmps().join()&&+x.packed===n('packed')&&+x.waste===n('pwaste')))W.push('Istnieje już identyczna pozycja (to samo zlecenie, data, zmiana, osoby i ilości) – czy to nie duplikat?')}}
+ return{E,W,o}}
+async function addEntry(){if(addBusy)return;addBusy=true;try{await refreshX();const M=model(),{E,W,o}=vEntry(M);$('entryOk').textContent='';$('entryErr').innerHTML=E.map(x=>'✖ '+esc(x)).join('<br>');if(E.length)return;if(W.length&&!confirm('Uwaga:\n• '+W.join('\n• ')+'\n\nZapisać mimo to?'))return;
+ const emps=getEmps(),p=+$('packed').value,w=+$('pwaste').value;
+ state.entries.push({uid:newUid(),created:Date.now(),updated:Date.now(),date:$('day').value||today(),src_uid:'',src_order:o.name,src_label:'Zlecenie '+o.name,employee:emps[0],employees:emps,shift:$('shift').value,people:+$('people').value,packed:p,waste:w,notes:$('notes').value,by:me().name});
+ logEv('Pakowanie: dodano',eDesc(state.entries.at(-1)));save();$('packed').value=0;$('pwaste').value=0;$('notes').value='';$('entryOk').textContent='✔ Dodano pozycję: '+p+' szt. przekazano do Klejenia (WIP 2)'+(w?', braki: '+w+' szt.':'')+'.';render()}finally{addBusy=false}}
+function edit(i){const x=state.entries[i];editIndex=i;const L=empList(x);$('eEmployee').innerHTML=empOpts(L[0],L);$('eDate').value=x.date||today();$('eSrc').value=ordOf(x);$('eShift').value=x.shift||'1';$('ePeople').value=x.people||1;empFields(true,L.slice(1));$('ePacked').value=x.packed||0;$('eWaste').value=x.waste||0;$('eNotes').value=x.notes||'';$('editModal').style.display='block';window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'})}
+function saveEdit(){if(editIndex===null)return;const n=k=>+$(k).value,d=$('eDate').value,E=[],W=[],x=state.entries[editIndex];
+ if(!d||isNaN(Date.parse(d)))E.push('Nieprawidłowa data.');else if(d>today())E.push('Data nie może być z przyszłości.');
+ if(['ePacked','eWaste'].some(k=>!Number.isInteger(n(k))||n(k)<0))E.push('Pola ilościowe muszą być liczbami całkowitymi ≥ 0.');
+ if(!Number.isInteger(n('ePeople'))||n('ePeople')<1)E.push('„Ilość osób” musi być liczbą całkowitą ≥ 1.');
+ {const m=empErr(true,n('ePeople'));if(m)E.push(m)}
+ if(E.length)return alert(E.join('\n'));
+ const M=model(),o=M.ord[ordOf(x,M)],dp=n('ePacked')-(+x.packed||0),dw=n('eWaste')-(+x.waste||0);
+ if(o&&o.roll-o.packed-o.waste-dp-dw<0)W.push('Spakowano + braki przekracza ilość wyprodukowaną w Etapie 1 dla tego zlecenia.');
+ if(o&&o.wip2+dp<0)W.push('Z tego zlecenia pobrano już do Klejenia więcej sztuk, niż zostałoby spakowane (WIP 2 < 0).');
+ if(W.length&&!confirm('Uwaga:\n• '+W.join('\n• ')+'\n\nZapisać mimo to?'))return;
+ const snap=eDesc(x);Object.assign(x,{upd_by:me().name,updated:Date.now(),date:d,employee:getEmps(true)[0],employees:getEmps(true),shift:$('eShift').value,people:n('ePeople'),packed:n('ePacked'),waste:n('eWaste'),notes:$('eNotes').value});
+ logEv('Pakowanie: edycja',snap+'  →  '+eDesc(x));save();cancelEdit();render()}
+function cancelEdit(){editIndex=null;$('editModal').style.display='none'}
+function del(i){const x=state.entries[i],M=model(),o=M.ord[ordOf(x,M)],W=o&&o.wip2-(+x.packed||0)<0?'\n\n⚠ Klejenie pobrało już z tego zlecenia więcej sztuk, niż zostałoby spakowane – WIP 2 stanie się ujemne.':'';if(confirm('Usunąć wpis pakowania?'+W)){logEv('Pakowanie: usunięto',eDesc(x));state.deletedEntries.push(ensureUid(x));state.entries.splice(i,1);save();render()}}
+function renderHist(M=model()){const q=$('fQ').value.toLowerCase().trim(),F=id=>$(id).value,ed=can('entry.edit'),dd=can('entry.delete'),
+ L=state.entries.map((x,i)=>[x,i]).filter(([x])=>(!F('fO')||ordOf(x,M)===F('fO'))&&(!F('fE')||empList(x).includes(F('fE')))&&(!F('fF')||x.date>=F('fF'))&&(!F('fT')||x.date<=F('fT'))&&(!q||[ordOf(x,M),empList(x).join(' '),x.notes,x.by,x.date].join(' ').toLowerCase().includes(q))).reverse(),
+ P=L.reduce((s,[x])=>s+(+x.packed||0),0),Wt=L.reduce((s,[x])=>s+(+x.waste||0),0);
+ $('fInfo').textContent='Wyświetlono '+Math.min(L.length,fPage)+' z '+L.length+' (wszystkich wpisów: '+state.entries.length+')';
+ $('entries').innerHTML='<table><tr><th>Data</th><th>Zlecenie</th><th>Pakowacz</th><th>Zm.</th><th>Osób</th><th>Spakowano</th><th>Braki</th><th>Uwagi</th><th>Wpisał</th>'+(ed||dd?'<th></th>':'')+'</tr>'+L.slice(0,fPage).map(([x,i])=>`<tr><td>${fdate(x.date)}</td><td>${esc(ordOf(x,M))}</td><td>${esc(empList(x).join(', '))}</td><td>${x.shift}</td><td>${x.people}</td><td>${x.packed}</td><td>${x.waste}</td><td>${esc(x.notes)}</td><td>${esc(x.by)||'—'}</td>${ed||dd?`<td>${ed?`<button onclick="edit(${i})">Edytuj</button>`:''}${dd?`<button class="danger" onclick="del(${i})">Usuń</button>`:''}</td>`:''}</tr>`).join('')+`<tr><td colspan="5"><b>Razem (${L.length} wpisów)</b></td><td><b>${P}</b></td><td><b>${Wt}</b></td><td colspan="${2+(ed||dd?1:0)}"></td></tr></table>`+(L.length>fPage?'<button onclick="fPage+=100;renderHist()">Pokaż więcej</button>':'')}
+function clrF(){['fQ','fO','fE','fF','fT'].forEach(i=>$(i).value='');fPage=100;renderHist()}
+
+/* ===== Bufory WIP ===== */
+function renderWip(M=model()){const os=Object.values(M.ord).filter(o=>o.roll||o.packed||o.glued).sort((a,b)=>a.name.localeCompare(b.name)),tot=k=>os.reduce((s,o)=>s+o[k],0),gl=!!X.glue;
+ $('wipSrc').innerHTML=`Rolsiarka: ${X.roll?hhmm(X.rollAt):'<span class="bad">brak danych</span>'} · Klejenie: ${gl?hhmm(X.glueAt):'<span class="bad">brak danych</span>'}${X.err.length?' · <span class="bad">⚠ brak połączenia: '+X.err.join(', ')+'</span>':''}`;
+ $('wipTiles').innerHTML=tiles([['Rolsiarka – wykonano',tot('roll')],['Spakowano',tot('packed')],['Braki pakowania',tot('waste')],['⏳ WIP 1 · czeka na pakowanie',tot('wip1')],['⏳ WIP 2 · czeka na klejenie',gl?os.reduce((s,o)=>s+Math.max(o.wip2,0),0):'—']]);
+ $('wipTable').innerHTML=os.length?'<table><tr><th>Zlecenie</th><th>Cel</th><th>Rolsiarka wykonano</th><th>Spakowano</th><th>Braki pakowania</th><th>⏳ WIP 1</th><th>Klejenie pobrało</th><th>⏳ WIP 2</th><th>Uwagi</th></tr>'+os.map(o=>{const nt=[];if(o.over>0)nt.push('⚠ spakowano o '+o.over+' szt. więcej niż wykonano na Rolsiarce');if(gl&&o.wip2<0)nt.push('⚠ Klejenie pobrało o '+(-o.wip2)+' szt. za dużo');if(gl&&o.legacy)nt.push(o.legacy+' wpisów Klejenia sprzed WIP pominięto');return`<tr><td><b>${esc(o.name)}</b></td><td>${o.target||'—'}</td><td>${o.roll}</td><td>${o.packed}</td><td>${o.waste}</td><td><b>${o.wip1}</b></td><td>${gl?o.glued+o.rejected:'—'}</td><td class="${gl&&o.wip2<0?'bad':''}"><b>${gl?o.wip2:o.packed}</b></td><td class="${nt.length?'bad':''}">${nt.join('<br>')||'—'}</td></tr>`}).join('')+'</table>':'<p class="hint">Brak danych do wyświetlenia.</p>';
+ $('wipDisc').innerHTML=''}
+
+/* ===== Podsumowanie ===== */
+function sumRange(){const f=$('sF').value,t=$('sT').value;return state.entries.filter(x=>(!f||x.date>=f)&&(!t||x.date<=t))}
+function renderSummary(M=model()){const es=sumRange(),P=sum(es,'packed'),W=sum(es,'waste'),sh=shifts(es),pc=(w,p)=>(p+w)?(w/(p+w)*100).toFixed(1):'0.0',ordOf=x=>M.ro.get(x.src_uid)?.order||x.src_order;
+ $('stats').innerHTML=tiles([['Dni',new Set(es.map(x=>x.date)).size],['Zmiany',sh],['Wpisy',es.length],['Spakowano [szt.]',P],['Braki [szt.]',W],['Braki [%]',pc(W,P)],['Średnio / zmianę',sh?(P/sh).toFixed(1):0],['Osoby',new Set(es.flatMap(empList)).size]]);
+ const by=(kf)=>{const m={};es.forEach(x=>[].concat(kf(x)).forEach(k=>{const a=m[k]??={p:0,w:0,n:0,d:new Set(),s:new Set()};a.n++;a.p+=+x.packed||0;a.w+=+x.waste||0;a.d.add(x.date);a.s.add(x.date+'|'+x.shift)}));return m};
+ const mo=by(ordOf),me_=by(empList);
+ $('sumOrders').innerHTML=Object.keys(mo).length?'<table><tr><th>Zlecenie</th><th>Wpisy</th><th>Spakowano</th><th>Braki</th><th>Braki %</th></tr>'+Object.entries(mo).sort().map(([k,a])=>`<tr><td>${esc(k)}</td><td>${a.n}</td><td>${a.p}</td><td>${a.w}</td><td>${pc(a.w,a.p)}</td></tr>`).join('')+'</table>':'<p class="hint">Brak wpisów w wybranym okresie.</p>';
+ $('sumEmps').innerHTML=Object.keys(me_).length?'<table><tr><th>Pracownik</th><th>Dni</th><th>Zmiany</th><th>Wpisy</th></tr>'+Object.entries(me_).sort().map(([k,a])=>`<tr><td>${esc(k)}</td><td>${a.d.size}</td><td>${a.s.size}</td><td>${a.n}</td></tr>`).join('')+'</table><p class="hint">Produkcja i braki są wspólne dla całego zespołu zmiany – tabela pokazuje obecność.</p>':''}
+function exportCsv(){const es=sumRange(),M=model(),q=v=>{v=String(v??'');return/[;"\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};if(!es.length)return alert('Brak wpisów w wybranym okresie.');
+ const rows=[['Data','Zlecenie','Zmiana','Pakowacze','Osób','Spakowano','Braki','Uwagi','Wpisał'],...es.map(x=>[x.date,ordOf(x,M),x.shift,empList(x).join(', '),x.people,x.packed,x.waste,x.notes||'',x.by||''])];
+ logEv('Eksport','CSV pakowanie '+($('sF').value||'…')+' – '+($('sT').value||'…'));save();dl('\ufeff'+rows.map(r=>r.map(q).join(';')).join('\r\n')+'\r\n','pakowanie_'+today()+'.csv','text/csv;charset=utf-8')}
+
+/* ===== zapis konfiguracji, log, blokady ===== */
+function saveConfig(){const o=state.cfg,p=+$('cfgPeople').value;if(!Number.isInteger(p)||p<1)return alert('Domyślna ilość osób musi być liczbą całkowitą ≥ 1.');const emp=list($('cfgEmployees').value);
+ state.cfg={employees:emp.length?emp:o.employees,shift:$('cfgShift').value,people:p,idleMin:+$('cfgIdle').value||0};logEv('Konfiguracja','zapisano ustawienia');applyDef=true;state.cfgUpdated=Date.now();save();render()}
+function renderLog(){const q=$('lQ').value.toLowerCase(),F=id=>$(id).value,day=l=>ymd(new Date(l.ts)),L=state.log.filter(l=>(!F('lU')||l.user===F('lU'))&&(!F('lA')||l.act===F('lA'))&&(!F('lF')||day(l)>=F('lF'))&&(!F('lT')||day(l)<=F('lT'))&&(!q||(l.user+' '+l.act+' '+l.d).toLowerCase().includes(q))).reverse();
+ $('logList').innerHTML=`<p class="hint">Zdarzeń: ${L.length}${L.length>300?' (pokazano 300 najnowszych – zawęź filtry)':''}</p><table><tr><th>Czas</th><th>Użytkownik</th><th>Rola</th><th>Zdarzenie</th><th>Szczegóły</th></tr>`+L.slice(0,300).map(l=>`<tr><td>${new Date(l.ts).toLocaleString('pl-PL')}</td><td>${esc(l.user)}</td><td>${ROLES[l.role]||'—'}</td><td>${esc(l.act)}</td><td>${esc(l.d)}</td></tr>`).join('')+'</table>'}
+const guard=(p,...ns)=>ns.forEach(n=>{const f=window[n];window[n]=function(){return can(p)?f.apply(this,arguments):denied()}});
+guard('entry.add','addEntry');guard('entry.edit','edit','saveEdit');guard('entry.delete','del');guard('config','saveConfig','addUser','setRole','resetPin','delUser');guard('data','upload','download');guard('export','exportCsv');
+
+/* ===== widoki ===== */
+function tab(id,b){document.querySelectorAll('section').forEach(x=>x.classList.remove('show'));document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));$(id).classList.add('show');b.classList.add('active');render()}
+function render(){if(!gate())return;const u=me(),c=state.cfg;
+ $('userBar').innerHTML=`<span class="sync">👤 ${esc(u.name)} · ${ROLES[u.role]}</span> <button class="hbtn" onclick="pinOpen=1;curView='';render()">🔑 PIN</button> <button class="hbtn" onclick="logout()">Wyloguj</button>`;
+ Object.entries(TABS).forEach(([t,p])=>$('tb_'+t).style.display=can(p)?'':'none');
+ const vis=[...document.querySelectorAll('section')].find(s=>s.classList.contains('show'));
+ if(first||!vis||!can(TABS[vis.id])){first=0;const t=Object.keys(TABS).find(t=>can(TABS[t]));return tab(t,$('tb_'+t))}
+ const M=model(),sel=(id,arr,d)=>{const cur=$(id).value;$(id).innerHTML=arr.map(x=>`<option>${esc(x)}</option>`).join('');$(id).value=(!applyDef&&arr.map(String).includes(cur))?cur:String(d??'')};
+ sel('employee',c.employees,c.employees[0]);if(applyDef){$('shift').value=c.shift;$('people').value=c.people}empFields();$('day').value=$('day').value||today();
+ {const av=Object.values(M.ord).filter(o=>o.wip1>0).sort((a,b)=>a.name.localeCompare(b.name)),cur=$('order').value;
+  $('order').innerHTML=av.length?av.map(o=>`<option value="${esc(o.name)}">${esc(o.name)} · do spakowania: ${o.wip1} szt.</option>`).join(''):'<option value="">— brak zleceń do pakowania —</option>';$('order').value=av.some(o=>o.name===cur)?cur:(av[0]?.name||'')}
+ $('cfgEmployees').value=c.employees.join(', ');$('cfgShift').value=c.shift;$('cfgPeople').value=c.people;$('cfgIdle').value=c.idleMin;applyDef=false;
+ fill('fO',state.entries.map(x=>M.ro.get(x.src_uid)?.order||x.src_order));fill('fE',state.entries.flatMap(empList));
+ renderQueue(M);orderInfo(M);renderHist(M);
+ if(can('summary')){renderWip(M);renderSummary(M)}
+ if(can('log')){fill('lU',state.log.map(l=>l.user));fill('lA',state.log.map(l=>l.act));renderLog()}
+ if(can('config'))$('usersBox').innerHTML=usersHtml();idleReset()}
+$('appTitle').textContent='📦 Pakowanie · Etap 2 · v'+APP_VERSION;render();
+(async()=>{setSync('Pobieranie z chmury...');try{const r=await getCloud(),need=needPush(r),ch=mergeChanged(r);saveLocal();if(ch)render();if(need)await push();else setSync('Gotowy')}catch(e){setSync('Praca lokalna (brak sieci)')}synced=true;render();refreshX()})();
+setInterval(()=>{if(!document.hidden&&me())refreshX()},60000);
+
+</script></body></html>
