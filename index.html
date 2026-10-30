@@ -45,7 +45,7 @@ label.file input{display:none}
 </style></head><body>
 <header><span id="appTitle"></span><span class="hright"><span id="sync" class="sync">Status: ...</span><span id="xSt" class="sync x">WIP: ...</span><button class="hbtn" onclick="pull(true);refreshX()">🔄 Odśwież z chmury</button><span id="userBar"></span></span></header>
 <main class="wrap"><div class="tabs">
-<button id="tb_entry" onclick="tab('entry',this)">Pakowanie</button><button id="tb_wip" onclick="tab('wip',this)">Bufory WIP</button><button id="tb_summary" onclick="tab('summary',this)">Podsumowanie</button><button id="tb_config" onclick="tab('config',this)">Konfiguracja</button><button id="tb_data" onclick="tab('data',this)">Import / eksport</button><button id="tb_log" onclick="tab('log',this)">Log</button></div>
+<button id="tb_entry" onclick="tab('entry',this)">Pakowanie</button><button id="tb_orders" onclick="tab('orders',this)">Zlecenia</button><button id="tb_wip" onclick="tab('wip',this)">Bufory WIP</button><button id="tb_summary" onclick="tab('summary',this)">Podsumowanie</button><button id="tb_config" onclick="tab('config',this)">Konfiguracja</button><button id="tb_data" onclick="tab('data',this)">Import / eksport</button><button id="tb_log" onclick="tab('log',this)">Log</button></div>
 
 <section id="entry" class="show">
 <div class="panel"><h3>⏳ Do spakowania (WIP 1) – wg zleceń</h3>
@@ -61,6 +61,11 @@ label.file input{display:none}
 <button class="ok" onclick="addEntry()">➕ Dodaj pozycję i przekaż do Klejenia (WIP 2)</button></div>
 <div class="panel"><h3>Historia pakowania</h3><div class="grid"><label>Szukaj<input id="fQ" oninput="fPage=100;renderHist()" placeholder="zlecenie, osoba, uwagi…"></label><label>Zlecenie<select id="fO" onchange="fPage=100;renderHist()"></select></label><label>Pracownik<select id="fE" onchange="fPage=100;renderHist()"></select></label><label>Od<input id="fF" type="date" onchange="fPage=100;renderHist()"></label><label>Do<input id="fT" type="date" onchange="fPage=100;renderHist()"></label></div>
 <button onclick="clrF()">Wyczyść filtry</button> <span id="fInfo" class="hint"></span><div id="entries" class="xs"></div></div></section>
+
+<section id="orders"><div class="panel"><h3>Lista zleceń (z Etapu 1 → Pakowanie → Klejenie)</h3><p id="ordSrc" class="hint"></p>
+<div class="grid"><label>Pokaż<select id="oF" onchange="renderOrders()"><option value="">Wszystkie</option><option value="pack">Do spakowania</option><option value="done">Spakowane w całości</option></select></label><label>Szukaj zlecenia<input id="oQ" oninput="renderOrders()" placeholder="np. JOQ-1"></label></div><br>
+<div id="ordList" class="xs"></div>
+<p class="hint">Zlecenia zakłada się w Etapie 1 (Rolsiarka) – tutaj są tylko podglądem postępu: ile wykonano na Rolsiarce, ile spakowano i ile czeka na pakowanie (WIP 1) oraz na klejenie (WIP 2). Przycisk „Pakuj ▶” przenosi do formularza pakowania.</p></div></section>
 
 <section id="wip"><div class="panel"><h3>Bufory pomiędzy etapami (WIP)</h3><p id="wipSrc" class="hint"></p><div id="wipTiles"></div>
 <div id="wipTable" class="xs"></div><div id="wipDisc" class="xs"></div>
@@ -84,7 +89,7 @@ label.file input{display:none}
 <label>Spakowano [szt.]<input id="ePacked" type="number" min="0"></label><label>Odpady / braki [szt.]<input id="eWaste" type="number" min="0"></label></div>
 <label>Uwagi<textarea id="eNotes"></textarea></label><button class="ok" onclick="saveEdit()">💾 Zapisz zmiany</button> <button onclick="cancelEdit()">Anuluj</button></div></div>
 <script>
-const APP_VERSION='1.1',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
+const APP_VERSION='1.2',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
 const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>ymd(new Date());
 const fdate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?m[3]+'.'+m[2]+'.'+m[1]:(d||'—')};
@@ -127,7 +132,7 @@ function upload(el){const r=new FileReader;r.onload=async()=>{try{const u=unpack
 let X=JSON.parse(localStorage.getItem(LSX)||'null')||{roll:null,glue:null,rollAt:0,glueAt:0,err:[]},xBusy=false;
 const setX=t=>{const e=$('xSt');if(e)e.textContent='WIP: '+t};
 async function fj(url){const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);try{const r=await fetch(url+'?nocache='+Date.now(),{cache:'no-store',signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
-const normRoll=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||('h'+hash(JSON.stringify(e))),date:e.date||'',order:e.order||'',machine:e.machine||'',bobbin:e.bobbin_index||'',shift:e.shift||'',employee:e.employee||'',paper:e.paper||'',produced:+e.produced||0})),orders:(d.orders||[]).map(o=>({name:o.name,target:+o.target||0}))}};
+const normRoll=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||('h'+hash(JSON.stringify(e))),date:e.date||'',order:e.order||'',machine:e.machine||'',bobbin:e.bobbin_index||'',shift:e.shift||'',employee:e.employee||'',paper:e.paper||'',produced:+e.produced||0})),orders:(d.orders||[]).map(o=>({name:o.name,target:+o.target||0,closed:!!o.closed}))}};
 const normGlue=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||'',date:e.date||'',order:e.order||'',produced:+e.produced||0,rejected:+e.rolls_rejected||0,wip:!!e.wip}))}};
 async function refreshX(){if(xBusy)return;xBusy=true;setX('pobieranie…');const er=[],[a,b]=await Promise.allSettled([fj(ROLL_URL),fj(GLUE_URL)]);
  try{if(a.status!=='fulfilled')throw 0;X.roll=normRoll(a.value);X.rollAt=Date.now()}catch(e){er.push('Rolsiarka')}
@@ -141,7 +146,7 @@ function model(){const R=X.roll?.entries||[],ro=new Map(R.map(r=>[r.uid,r])),ord
  R.forEach(r=>{if(r.produced>0)O(r.order).roll+=r.produced});
  state.entries.forEach(p=>{const o=O(ro.get(p.src_uid)?.order||p.src_order||'?');o.packed+=+p.packed||0;o.waste+=+p.waste||0});
  (X.glue?.entries||[]).forEach(e=>{const o=O(e.order);if(e.wip){o.glued+=e.produced;o.rejected+=e.rejected}else o.legacy++});
- (X.roll?.orders||[]).forEach(q=>{if(ord[q.name])ord[q.name].target=q.target});
+ (X.roll?.orders||[]).forEach(q=>{const o=O(q.name);o.target=q.target;o.closed=q.closed});
  Object.values(ord).forEach(o=>{const l=o.roll-o.packed-o.waste;o.wip1=Math.max(l,0);o.over=Math.max(-l,0);o.wip2=o.packed-o.glued-o.rejected});
  return{ord,ro}}
 const ordOf=(x,M=model())=>M.ro.get(x.src_uid)?.order||x.src_order||'?';
@@ -150,7 +155,7 @@ const ordOf=(x,M=model())=>M.ro.get(x.src_uid)?.order||x.src_order||'?';
 let synced=false,curView='',pinOpen=0,first=1,applyDef=true,fPage=100,editIndex=null,fails=JSON.parse(localStorage.pakLock||'{}');
 const ROLES={admin:'Administrator',owner:'Właściciel',operator:'Operator'},
 PERMS={admin:'entry.add entry.edit entry.delete order.manage summary export config data log override'.split(' '),owner:'entry.add entry.edit entry.delete order.manage summary export override'.split(' '),operator:['entry.add']},
-TABS={entry:'entry.add',wip:'summary',summary:'summary',config:'config',data:'data',log:'log'};
+TABS={entry:'entry.add',orders:'entry.add',wip:'summary',summary:'summary',config:'config',data:'data',log:'log'};
 const me=()=>state.users.find(u=>u.id===sessionStorage.pakU),can=p=>!!me()&&PERMS[me().role].includes(p),denied=()=>alert('Brak uprawnień do tej operacji.');
 const eDesc=x=>`${x.date} · ${x.src_order||'?'} · zm.${x.shift} · ${empList(x).join(', ')} · osób ${x.people} · spak. ${x.packed}, braki ${x.waste}`;
 function logEv(act,d,uname){const u=me();state.log.push({id:newUid(),ts:Date.now(),user:uname||(u?u.name:'—'),role:u?u.role:'',act,d:d||''});if(state.log.length>3000)state.log.splice(0,state.log.length-3000)}
@@ -241,6 +246,16 @@ function renderHist(M=model()){const q=$('fQ').value.toLowerCase().trim(),F=id=>
  $('entries').innerHTML='<table><tr><th>Data</th><th>Zlecenie</th><th>Pakowacz</th><th>Zm.</th><th>Osób</th><th>Spakowano</th><th>Braki</th><th>Uwagi</th><th>Wpisał</th>'+(ed||dd?'<th></th>':'')+'</tr>'+L.slice(0,fPage).map(([x,i])=>`<tr><td>${fdate(x.date)}</td><td>${esc(ordOf(x,M))}</td><td>${esc(empList(x).join(', '))}</td><td>${x.shift}</td><td>${x.people}</td><td>${x.packed}</td><td>${x.waste}</td><td>${esc(x.notes)}</td><td>${esc(x.by)||'—'}</td>${ed||dd?`<td>${ed?`<button onclick="edit(${i})">Edytuj</button>`:''}${dd?`<button class="danger" onclick="del(${i})">Usuń</button>`:''}</td>`:''}</tr>`).join('')+`<tr><td colspan="5"><b>Razem (${L.length} wpisów)</b></td><td><b>${P}</b></td><td><b>${Wt}</b></td><td colspan="${2+(ed||dd?1:0)}"></td></tr></table>`+(L.length>fPage?'<button onclick="fPage+=100;renderHist()">Pokaż więcej</button>':'')}
 function clrF(){['fQ','fO','fE','fF','fT'].forEach(i=>$(i).value='');fPage=100;renderHist()}
 
+/* ===== Lista zleceń (podgląd) ===== */
+function packOrder(i){const n=ordNames[i];tab('entry',$('tb_entry'));pick(n)}
+let ordNames=[];
+function renderOrders(M=model()){const f=$('oF').value,q=$('oQ').value.toLowerCase().trim(),ad=can('entry.add'),
+ L=Object.values(M.ord).filter(o=>(o.roll||o.packed||o.glued||o.target)&&(!f||(f==='pack'?o.wip1>0:(o.roll>0&&o.wip1===0)))&&(!q||o.name.toLowerCase().includes(q))).sort((a,b)=>a.name.localeCompare(b.name));
+ ordNames=L.map(o=>o.name);
+ $('ordSrc').innerHTML=X.roll?`Dane z Rolsiarki: ${hhmm(X.rollAt)}${X.err.includes('Rolsiarka')?' <span class="bad">⚠ brak połączenia – dane z pamięci podręcznej</span>':''}`:'<span class="bad">⚠ Brak danych z Rolsiarki – sprawdź połączenie i kliknij „Odśwież z chmury”.</span>';
+ $('ordList').innerHTML=L.length?'<table><tr><th>Zlecenie</th><th>Cel</th><th>① Rolsiarka wykonano</th><th>② Spakowano</th><th>Braki</th><th>⏳ Do spakowania (WIP 1)</th><th>③ Klejenie pobrało</th><th>⏳ WIP 2</th><th>Postęp pakowania</th><th>Status</th>'+(ad?'<th></th>':'')+'</tr>'+L.map((o,i)=>{const base=o.target||o.roll,pc=base?Math.min(100,o.packed/base*100):0,st=o.over>0?'<span class="bad">⚠ spakowano więcej niż wykonano</span>':o.wip1>0?'Do spakowania':o.roll>0?'<span class="good">Spakowane na bieżąco</span>':'Czeka na Rolsiarkę';
+  return`<tr><td><b>${esc(o.name)}</b>${o.closed?' <span class="hint">(zamknięte w Etapie 1)</span>':''}</td><td>${o.target||'—'}</td><td>${o.roll}</td><td>${o.packed}</td><td>${o.waste}</td><td><b>${o.wip1}</b></td><td>${X.glue?o.glued+o.rejected:'—'}</td><td class="${X.glue&&o.wip2<0?'bad':''}"><b>${X.glue?o.wip2:o.packed}</b></td><td style="min-width:120px"><div class="progress"><i style="width:${pc}%"></i></div>${o.packed} / ${base||'—'}</td><td>${st}</td>${ad?`<td>${o.wip1>0?`<button onclick="packOrder(${i})">Pakuj ▶</button>`:''}</td>`:''}</tr>`}).join('')+'</table>':'<p class="hint">Brak zleceń spełniających kryteria (lub brak danych z Rolsiarki).</p>'}
+
 /* ===== Bufory WIP ===== */
 function renderWip(M=model()){const os=Object.values(M.ord).filter(o=>o.roll||o.packed||o.glued).sort((a,b)=>a.name.localeCompare(b.name)),tot=k=>os.reduce((s,o)=>s+o[k],0),gl=!!X.glue;
  $('wipSrc').innerHTML=`Rolsiarka: ${X.roll?hhmm(X.rollAt):'<span class="bad">brak danych</span>'} · Klejenie: ${gl?hhmm(X.glueAt):'<span class="bad">brak danych</span>'}${X.err.length?' · <span class="bad">⚠ brak połączenia: '+X.err.join(', ')+'</span>':''}`;
@@ -269,7 +284,7 @@ const guard=(p,...ns)=>ns.forEach(n=>{const f=window[n];window[n]=function(){ret
 guard('entry.add','addEntry');guard('entry.edit','edit','saveEdit');guard('entry.delete','del');guard('config','saveConfig','addUser','setRole','resetPin','delUser');guard('data','upload','download');guard('export','exportCsv');
 
 /* ===== widoki ===== */
-function tab(id,b){document.querySelectorAll('section').forEach(x=>x.classList.remove('show'));document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));$(id).classList.add('show');b.classList.add('active');render()}
+function tab(id,b){document.querySelectorAll('section').forEach(x=>x.classList.remove('show'));document.querySelectorAll('.tabs button').forEach(x=>x.classList.remove('active'));$(id).classList.add('show');b.classList.add('active');render();if(id==='orders'||id==='wip'||id==='entry')refreshX()}
 function render(){if(!gate())return;const u=me(),c=state.cfg;
  $('userBar').innerHTML=`<span class="sync">👤 ${esc(u.name)} · ${ROLES[u.role]}</span> <button class="hbtn" onclick="pinOpen=1;curView='';render()">🔑 PIN</button> <button class="hbtn" onclick="logout()">Wyloguj</button>`;
  Object.entries(TABS).forEach(([t,p])=>$('tb_'+t).style.display=can(p)?'':'none');
@@ -281,7 +296,7 @@ function render(){if(!gate())return;const u=me(),c=state.cfg;
   $('order').innerHTML=av.length?av.map(o=>`<option value="${esc(o.name)}">${esc(o.name)} · do spakowania: ${o.wip1} szt.</option>`).join(''):'<option value="">— brak zleceń do pakowania —</option>';$('order').value=av.some(o=>o.name===cur)?cur:(av[0]?.name||'')}
  $('cfgEmployees').value=c.employees.join(', ');$('cfgShift').value=c.shift;$('cfgPeople').value=c.people;$('cfgIdle').value=c.idleMin;applyDef=false;
  fill('fO',state.entries.map(x=>M.ro.get(x.src_uid)?.order||x.src_order));fill('fE',state.entries.flatMap(empList));
- renderQueue(M);orderInfo(M);renderHist(M);
+ renderQueue(M);orderInfo(M);renderHist(M);renderOrders(M);
  if(can('summary')){renderWip(M);renderSummary(M)}
  if(can('log')){fill('lU',state.log.map(l=>l.user));fill('lA',state.log.map(l=>l.act));renderLog()}
  if(can('config'))$('usersBox').innerHTML=usersHtml();idleReset()}
