@@ -93,7 +93,7 @@ label.file input{display:none}
 <label>Spakowano [szt.]<input id="ePacked" type="number" min="0"></label><label>Odpady / braki [szt.]<input id="eWaste" type="number" min="0"></label></div>
 <label>Uwagi<textarea id="eNotes"></textarea></label><button class="ok" onclick="saveEdit()">💾 Zapisz zmiany</button> <button onclick="cancelEdit()">Anuluj</button></div></div>
 <script>
-const APP_VERSION='1.4',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
+const APP_VERSION='1.4.1',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
 const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>ymd(new Date());
 const fdate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?m[3]+'.'+m[2]+'.'+m[1]:(d||'—')};
@@ -149,10 +149,12 @@ function upload(el){const r=new FileReader;r.onload=async()=>{try{const u=unpack
 let X=JSON.parse(localStorage.getItem(LSX)||'null')||{roll:null,glue:null,rollAt:0,glueAt:0,err:[]},xBusy=false;
 const setX=t=>{const e=$('xSt');if(e)e.textContent='WIP: '+t};
 async function fj(url){const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);try{const r=await fetch(url+'?nocache='+Date.now(),{cache:'no-store',signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
-const normRoll=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||('h'+hash(JSON.stringify(e))),date:e.date||'',order:e.order||'',machine:e.machine||'',bobbin:e.bobbin_index||'',shift:e.shift||'',employee:e.employee||'',paper:e.paper||'',produced:+e.produced||0})),orders:(d.orders||[]).map(o=>({name:o.name,target:+o.target||0,closed:!!o.closed}))}};
+const normRoll=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||('h'+hash(JSON.stringify(e))),date:e.date||'',order:e.order||'',machine:e.machine||'',bobbin:e.bobbin_index||'',shift:e.shift||'',employee:e.employee||'',paper:e.paper||'',produced:+e.produced||0})),orders:(d.orders||[]).map(o=>({name:o.name,target:+o.target||0,closed:!!o.closed,aliases:Array.isArray(o.aliases)?o.aliases:[]}))}};
 const normGlue=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||'',date:e.date||'',order:e.order||'',produced:+e.produced||0,rejected:+e.rolls_rejected||0,wip:!!e.wip}))}};
+function healNames(){const os=X.roll&&X.roll.orders||[];if(!os.length)return;const cur=new Set(os.map(o=>o.name)),al=new Map();os.forEach(o=>(o.aliases||[]).forEach(a=>{if(cur.has(a))return;al.set(a,al.has(a)&&al.get(a)!==o.name?null:o.name)}));let n=0;state.entries.forEach(e=>{const t=!e.src_uid&&al.get(e.src_order);if(t){const o=e.src_order;e.src_order=t;if(e.src_label==='Zlecenie '+o)e.src_label='Zlecenie '+t;e.updated=Date.now();n++}});if(n){logEv('Zlecenie: ujednolicono nazwę we wpisach',n+' wpisów (zmiana nazwy w Etapie 1)');save()}}
 async function refreshX(){if(xBusy)return;xBusy=true;setX('pobieranie…');const er=[],[a,b]=await Promise.allSettled([fj(ROLL_URL),fj(GLUE_URL)]);
  try{if(a.status!=='fulfilled')throw 0;X.roll=normRoll(a.value);X.rollAt=Date.now()}catch(e){er.push('Rolsiarka')}
+ try{healNames()}catch(_){}
  try{if(b.status!=='fulfilled')throw 0;X.glue=normGlue(b.value);X.glueAt=Date.now()}catch(e){er.push('Klejenie')}
  X.err=er;try{localStorage.setItem(LSX,JSON.stringify(X))}catch(_){}
  setX(er.length?'brak połączenia ('+er.join(', ')+')'+(X.roll?' – dane z '+hhmm(X.rollAt):' – brak danych'):'aktualne '+hhmm(Date.now()));xBusy=false;render()}
