@@ -94,7 +94,7 @@ label.file input{display:none}
 <label>Spakowano [szt.]<input id="ePacked" type="number" min="0"></label><label>Odpady / braki [szt.]<input id="eWaste" type="number" min="0"></label></div>
 <label>Uwagi<textarea id="eNotes"></textarea></label><button class="ok" onclick="saveEdit()">💾 Zapisz zmiany</button> <button onclick="cancelEdit()">Anuluj</button></div></div>
 <script>
-const APP_VERSION='1.7.3',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
+const APP_VERSION='1.7.4',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
 const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>ymd(new Date());
 const fdate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?m[3]+'.'+m[2]+'.'+m[1]:(d||'—')};
@@ -608,7 +608,7 @@ setInterval(()=>{if(!document.hidden&&me())refreshX()},60000);
 /* ===== Pływający panel nawigacji MES (ten sam w Etapach 1–3) ===== */
 (function(){
  const CUR='pakowanie',KEY='mesNavUrls',OPEN='mesNavOpen',
- ST=[{id:'bobbin',n:1,name:'Rolsiarka',ico:'🌀',def:'https://silverlife666.github.io/Bobina/'},{id:'pakowanie',n:2,name:'Pakowanie',ico:'📦',def:'https://silverlife666.github.io/pakowanie/'},{id:'klejenie',n:3,name:'Klejenie',ico:'🧴',def:'https://silverlife666.github.io/klejenie/'},{id:'raport',n:0,name:'Raport tygodniowy',ico:'📧',def:'https://silverlife666.github.io/raport/'}],
+ ST=[{id:'bobbin',n:1,name:'Rolsiarka',ico:'🌀',def:'https://silverlife666.github.io/Bobina/'},{id:'pakowanie',n:2,name:'Pakowanie',ico:'📦',def:'https://silverlife666.github.io/pakowanie/'},{id:'klejenie',n:3,name:'Klejenie',ico:'🧴',def:'https://silverlife666.github.io/klejenie/'},{id:'raport',n:0,name:'Raport tygodniowy',ico:'📧',def:'https://silverlife666.github.io/raport/'},{id:'hala',n:0,name:'Hala (przegląd zleceń)',ico:'🏭',def:'https://silverlife666.github.io/hala/'}],
  esc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let U={};try{U=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){}
  let open=(()=>{try{const v=localStorage.getItem(OPEN);return v===null?innerWidth>900:v==='1'}catch(e){return true}})();
