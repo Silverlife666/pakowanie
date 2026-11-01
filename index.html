@@ -94,7 +94,7 @@ label.file input{display:none}
 <label>Spakowano [szt.]<input id="ePacked" type="number" min="0"></label><label>Odpady / braki [szt.]<input id="eWaste" type="number" min="0"></label></div>
 <label>Uwagi<textarea id="eNotes"></textarea></label><button class="ok" onclick="saveEdit()">💾 Zapisz zmiany</button> <button onclick="cancelEdit()">Anuluj</button></div></div>
 <script>
-const APP_VERSION='1.7.2',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
+const APP_VERSION='1.7.3',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
 const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>ymd(new Date());
 const fdate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?m[3]+'.'+m[2]+'.'+m[1]:(d||'—')};
@@ -637,6 +637,28 @@ setInterval(()=>{if(!document.hidden&&me())refreshX()},60000);
    '<div class="ft"><button type="button" id="mesNavCfg">⚙ Ustaw adresy</button></div></div>';
   root.querySelector('.hd').onclick=()=>setOpen(false);root.querySelector('#mesNavCfg').onclick=settings}
  draw();
+})();
+</script>
+<script>
+/* ===== Automatyczne wykrywanie nowej wersji (jak w Hali) ===== */
+(function(){
+ const EVERY=300000,IDLE=60000,K='mesReloadTry';let lastIn=Date.now(),pending=null,bar=null;
+ ['input','keydown','pointerdown'].forEach(e=>addEventListener(e,()=>{lastIn=Date.now()},true));
+ const busy=()=>{const a=document.activeElement;return Date.now()-lastIn<IDLE||(a&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))};
+ function banner(v){if(bar)return;bar=document.createElement('div');bar.setAttribute('role','status');bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99;background:#25476a;color:#fff;padding:8px 12px;font:14px system-ui,sans-serif;text-align:center';bar.innerHTML='Dostępna nowa wersja aplikacji ('+v+'). <button type="button" style="margin-left:8px;padding:3px 10px;cursor:pointer">Odśwież teraz</button>';bar.querySelector('button').onclick=()=>go(v);document.body.appendChild(bar)}
+ function go(v){try{sessionStorage.setItem(K,v)}catch(e){}location.reload()}
+ async function check(){
+  try{
+   if(!pending){
+    const r=await fetch(location.href.split('#')[0].split('?')[0]+'?v='+Date.now(),{cache:'no-store'});
+    if(!r.ok)return;const m=(await r.text()).match(/APP_VERSION='(\d+\.\d+\.\d+)'/);
+    if(!m||m[1]===APP_VERSION)return;pending=m[1]}
+   let tried='';try{tried=sessionStorage.getItem(K)||''}catch(e){}
+   if(tried===pending){banner(pending);return}
+   if(busy())banner(pending);else go(pending)
+  }catch(e){}}
+ setInterval(()=>{if(pending){if(!busy()){let t='';try{t=sessionStorage.getItem(K)||''}catch(e){}if(t!==pending)go(pending)}}else check()},60000);
+ setTimeout(check,15000);setInterval(()=>{if(!pending)check()},EVERY);
 })();
 </script>
 </body></html>
