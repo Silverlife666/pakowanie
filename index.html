@@ -45,7 +45,7 @@ label.file input{display:none}
 </style></head><body>
 <header><span id="appTitle"></span><span class="hright"><span id="sync" class="sync">Status: ...</span><span id="xSt" class="sync x">WIP: ...</span><button class="hbtn" onclick="pull(true);refreshX()">🔄 Odśwież z chmury</button><span id="userBar"></span></span></header>
 <main class="wrap"><div class="tabs">
-<button id="tb_entry" onclick="tab('entry',this)">Pakowanie</button><button id="tb_orders" onclick="tab('orders',this)">Zlecenia</button><button id="tb_wip" onclick="tab('wip',this)">Bufory WIP</button><button id="tb_summary" onclick="tab('summary',this)">Podsumowanie</button><button id="tb_config" onclick="tab('config',this)">Konfiguracja</button><button id="tb_data" onclick="tab('data',this)">Import / eksport</button><button id="tb_log" onclick="tab('log',this)">Log</button></div>
+<button id="tb_entry" onclick="tab('entry',this)">Pakowanie</button><button id="tb_orders" onclick="tab('orders',this)">Zlecenia</button><button id="tb_wip" onclick="tab('wip',this)">Bufory WIP</button><button id="tb_summary" onclick="tab('summary',this)">Podsumowanie</button><button id="tb_config" onclick="tab('config',this)">Konfiguracja</button><button id="tb_data" onclick="tab('data',this)">Import / eksport</button><button id="tb_corr" onclick="tab('corr',this)">Korekty</button><button id="tb_log" onclick="tab('log',this)">Log</button></div>
 
 <section id="entry" class="show">
 <div class="panel"><h3>⏳ Do spakowania (WIP 1) – wg zleceń</h3>
@@ -85,6 +85,7 @@ label.file input{display:none}
 
 <section id="data"><div class="panel"><h3>Przenoszenie danych</h3><button onclick="pull(true)">🔄 Odśwież z chmury</button> <button onclick="download()">⬇ Eksportuj JSON</button> <label class="file">⬆ Importuj JSON<input type="file" accept="application/json" onchange="upload(this)"></label><p class="hint">Dane synchronizują się z chmurą (Supabase, funkcja pakowanie-sync) po każdej zmianie, a kopia lokalna działa awaryjnie, gdy nie ma sieci. Import JSON zastępuje dane lokalne i w chmurze.</p><p id="last" class="hint"></p></div></section>
 
+<section id="corr"></section>
 <section id="log"><div class="panel"><h3>Dziennik zdarzeń</h3><div class="grid"><label>Szukaj<input id="lQ" oninput="renderLog()"></label><label>Użytkownik<select id="lU" onchange="renderLog()"></select></label><label>Zdarzenie<select id="lA" onchange="renderLog()"></select></label><label>Od<input id="lF" type="date" onchange="renderLog()"></label><label>Do<input id="lT" type="date" onchange="renderLog()"></label></div><div id="logList" class="xs"></div><p class="hint">Log jest tylko do odczytu (ostatnie 3000 zdarzeń).</p></div></section>
 </main><div id="auth"></div>
 
@@ -93,14 +94,14 @@ label.file input{display:none}
 <label>Spakowano [szt.]<input id="ePacked" type="number" min="0"></label><label>Odpady / braki [szt.]<input id="eWaste" type="number" min="0"></label></div>
 <label>Uwagi<textarea id="eNotes"></textarea></label><button class="ok" onclick="saveEdit()">💾 Zapisz zmiany</button> <button onclick="cancelEdit()">Anuluj</button></div></div>
 <script>
-const APP_VERSION='1.5.0',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
+const APP_VERSION='1.6.0',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
 const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>ymd(new Date());
 const fdate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?m[3]+'.'+m[2]+'.'+m[1]:(d||'—')};
 const hhmm=t=>{if(!t)return'—';const n=new Date(t),p=v=>String(v).padStart(2,'0');return p(n.getHours())+':'+p(n.getMinutes())};
 const def={employees:['Operator'],shift:'1',people:1,idleMin:30,company:'',footer:'',pdfHistory:'TAK'};
 let state=JSON.parse(localStorage.getItem(LS)||'{}');
-['entries','deletedEntries','users','log','deletedUsers'].forEach(k=>state[k]??=[]);
+['entries','deletedEntries','users','log','deletedUsers','corr'].forEach(k=>state[k]??=[]);
 state.cfgUpdated??=0;state.lastModified??='—';state.cfg={...def,...(state.cfg||{})};
 const saveLocal=()=>localStorage.setItem(LS,JSON.stringify(state)),save=()=>{saveLocal();push();usersAfterSave()};
 const newUid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
@@ -142,16 +143,16 @@ async function push(force){if(busy){again=true;return}busy=true;setSync('Zapisyw
 async function pull(show){syncUsers();setSync('Pobieranie z chmury...');try{const r=await getCloud(),need=needPush(r),ch=mergeChanged(r);saveLocal();if(ch)render();if(need)await push();else setSync('Gotowy');if(show)alert('Pobrano najnowsze dane z chmury.')}catch(e){setSync('Praca lokalna (brak sieci)');if(show)alert('Nie udało się połączyć z chmurą.')}}
 function dl(text,name,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500)}
 function download(){logEv('Eksport JSON','pełna kopia danych');save();dl(JSON.stringify(pack(false),null,2),'pakowanie.json','application/json')}
-function upload(el){const r=new FileReader;r.onload=async()=>{try{const u=unpack(JSON.parse(r.result));if(!confirm('Import zastąpi dane lokalne i w chmurze. Kontynuować?'))return;const old=[...state.entries];try{const c=await getCloud();old.push(...c.entries)}catch(_){}
- const keep=new Set(u.entries.map(ensureUid));state.entries=u.entries;state.cfg={...def,...u.cfg};state.cfgUpdated=Date.now();state.deletedEntries=[...new Set(old.map(ensureUid))].filter(x=>!keep.has(x));logEv('Import danych','JSON: '+u.entries.length+' wpisów');saveLocal();render();await push(true);alert('Zaimportowano dane.')}catch(e){alert('Błędny plik JSON: '+e.message)}};r.readAsText(el.files[0])}
+function upload(el){const r=new FileReader;r.onload=async()=>{try{const u=unpack(JSON.parse(r.result));if(!confirm('Import zastąpi dane lokalne i w chmurze. Kontynuować?'))return;const old=[...state.entries,...state.corr];try{const c=await getCloud();old.push(...c.entries,...(c.corr||[]))}catch(_){}
+ const keep=new Set([...u.entries,...(u.corr||[])].map(ensureUid));state.entries=u.entries;state.corr=u.corr||[];state.cfg={...def,...u.cfg};state.cfgUpdated=Date.now();state.deletedEntries=[...new Set(old.map(ensureUid))].filter(x=>!keep.has(x));logEv('Import danych','JSON: '+u.entries.length+' wpisów');saveLocal();render();await push(true);alert('Zaimportowano dane.')}catch(e){alert('Błędny plik JSON: '+e.message)}};r.readAsText(el.files[0])}
 
 /* ===== WIP: odczyt (tylko do odczytu) Etapu 1 – Rolsiarka i Etapu 3 – Klejenie ===== */
 let X=JSON.parse(localStorage.getItem(LSX)||'null')||{roll:null,glue:null,rollAt:0,glueAt:0,err:[]},xBusy=false;
 const setX=t=>{const e=$('xSt');if(e)e.textContent='WIP: '+t};
 async function fj(url){const c=new AbortController(),t=setTimeout(()=>c.abort(),6000);try{const r=await fetch(url+'?nocache='+Date.now(),{cache:'no-store',signal:c.signal});if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}finally{clearTimeout(t)}}
-const normRoll=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||('h'+hash(JSON.stringify(e))),date:e.date||'',order:e.order||'',machine:e.machine||'',bobbin:e.bobbin_index||'',shift:e.shift||'',employee:e.employee||'',paper:e.paper||'',produced:+e.produced||0})),orders:(d.orders||[]).map(o=>({name:o.name,target:+o.target||0,closed:!!o.closed,aliases:Array.isArray(o.aliases)?o.aliases:[]}))}};
+const normRoll=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||('h'+hash(JSON.stringify(e))),date:e.date||'',order:e.order||'',machine:e.machine||'',bobbin:e.bobbin_index||'',shift:e.shift||'',employee:e.employee||'',paper:e.paper||'',produced:+e.produced||0,corr:e.kind==='corr'})),orders:(d.orders||[]).map(o=>({name:o.name,target:+o.target||0,closed:!!o.closed,aliases:Array.isArray(o.aliases)?o.aliases:[]}))}};
 const normGlue=p=>{const d=p.data||p;return{entries:(d.entries||[]).map(e=>({uid:e.uid||'',date:e.date||'',order:e.order||'',produced:+e.produced||0,rejected:+e.rolls_rejected||0,wip:!!e.wip}))}};
-function healNames(){const os=X.roll&&X.roll.orders||[];if(!os.length)return;const cur=new Set(os.map(o=>o.name)),al=new Map();os.forEach(o=>(o.aliases||[]).forEach(a=>{if(cur.has(a))return;al.set(a,al.has(a)&&al.get(a)!==o.name?null:o.name)}));let n=0;state.entries.forEach(e=>{const t=!e.src_uid&&al.get(e.src_order);if(t){const o=e.src_order;e.src_order=t;if(e.src_label==='Zlecenie '+o)e.src_label='Zlecenie '+t;e.updated=Date.now();n++}});if(n){logEv('Zlecenie: ujednolicono nazwę we wpisach',n+' wpisów (zmiana nazwy w Etapie 1)');save()}}
+function healNames(){const os=X.roll&&X.roll.orders||[];if(!os.length)return;const cur=new Set(os.map(o=>o.name)),al=new Map();os.forEach(o=>(o.aliases||[]).forEach(a=>{if(cur.has(a))return;al.set(a,al.has(a)&&al.get(a)!==o.name?null:o.name)}));let n=0;state.entries.forEach(e=>{const t=!e.src_uid&&al.get(e.src_order);if(t){const o=e.src_order;e.src_order=t;if(e.src_label==='Zlecenie '+o)e.src_label='Zlecenie '+t;e.updated=Date.now();n++}});state.corr.forEach(e=>{const t=al.get(e.src_order);if(t){e.src_order=t;e.updated=Date.now();n++}});if(n){logEv('Zlecenie: ujednolicono nazwę we wpisach',n+' wpisów (zmiana nazwy w Etapie 1)');save()}}
 async function refreshX(){if(xBusy)return;xBusy=true;setX('pobieranie…');const er=[],[a,b]=await Promise.allSettled([fj(ROLL_URL),fj(GLUE_URL)]);
  try{if(a.status!=='fulfilled')throw 0;X.roll=normRoll(a.value);X.rollAt=Date.now()}catch(e){er.push('Rolsiarka')}
  try{healNames()}catch(_){}
@@ -162,8 +163,8 @@ const code=uid=>'R-'+hash(String(uid)).toUpperCase().slice(-5).padStart(5,'0');
 const lbl=r=>`${r.code} · ${r.order} · ${fdate(r.date)} · ${r.machine||'—'} · bob. ${r.bobbin||'—'} · wyk. ${r.produced}`;
 /* Model buforów (na poziomie ZLECENIA): WIP1 = suma wykonanych (Etap 1) − spakowane − braki pakowania; WIP2 = spakowane − pobrane do Klejenia (wykonano + odrzucone rolki) */
 function model(){const R=X.roll?.entries||[],ro=new Map(R.map(r=>[r.uid,r])),ord={},O=n=>ord[n]??={name:n,target:0,roll:0,packed:0,waste:0,wip1:0,over:0,glued:0,rejected:0,legacy:0};
- R.forEach(r=>{if(r.produced>0)O(r.order).roll+=r.produced});
- state.entries.forEach(p=>{const o=O(ro.get(p.src_uid)?.order||p.src_order||'?');o.packed+=+p.packed||0;o.waste+=+p.waste||0});
+ R.forEach(r=>{if(r.produced>0||r.corr)O(r.order).roll+=r.produced});
+ state.entries.forEach(p=>{const o=O(ro.get(p.src_uid)?.order||p.src_order||'?');o.packed+=+p.packed||0;o.waste+=+p.waste||0});state.corr.forEach(p=>{const o=O(p.src_order||'?');o.packed+=+p.packed||0;o.waste+=+p.waste||0});
  (X.glue?.entries||[]).forEach(e=>{const o=O(e.order);if(e.wip){o.glued+=e.produced;o.rejected+=e.rejected}else o.legacy++});
  (X.roll?.orders||[]).forEach(q=>{const o=O(q.name);o.target=q.target;o.closed=q.closed});
  Object.values(ord).forEach(o=>{const l=o.roll-o.packed-o.waste;o.wip1=Math.max(l,0);o.over=Math.max(-l,0);o.wip2=o.packed-o.glued-o.rejected});
@@ -173,8 +174,8 @@ const ordOf=(x,M=model())=>M.ro.get(x.src_uid)?.order||x.src_order||'?';
 /* ===== logowanie, role, log ===== */
 let synced=false,curView='',pinOpen=0,first=1,applyDef=true,fPage=100,editIndex=null,fails=JSON.parse(localStorage.mes_lock||'{}');
 const ROLES={admin:'Administrator',owner:'Właściciel',operator:'Operator'},
-PERMS={admin:'entry.add entry.edit entry.delete order.manage summary export config data log override'.split(' '),owner:'entry.add entry.edit entry.delete order.manage summary export override'.split(' '),operator:['entry.add']},
-TABS={entry:'entry.add',orders:'entry.add',wip:'summary',summary:'summary',config:'config',data:'data',log:'log'};
+PERMS={admin:'entry.add entry.edit entry.delete order.manage summary export config data log override correct'.split(' '),owner:'entry.add entry.edit entry.delete order.manage summary export override correct'.split(' '),operator:['entry.add']},
+TABS={entry:'entry.add',orders:'entry.add',wip:'summary',summary:'summary',config:'config',data:'data',corr:'correct',log:'log'};
 const me=()=>state.users.find(u=>u.id===(sess()||{}).id),can=p=>!!me()&&PERMS[me().role].includes(p),denied=()=>alert('Brak uprawnień do tej operacji.');
 const eDesc=x=>`${x.date} · ${x.src_order||'?'} · zm.${x.shift} · ${empList(x).join(', ')} · osób ${x.people} · spak. ${x.packed}, braki ${x.waste}`;
 function logEv(act,d,uname){const u=me();state.log.push({id:newUid(),ts:Date.now(),user:uname||(u?u.name:'—'),role:u?u.role:'',act,d:d||''});if(state.log.length>3000)state.log.splice(0,state.log.length-3000)}
@@ -195,6 +196,60 @@ async function doLogin(){const pin0=$('lgP').value,uid0=$('lgU').value;await syn
  else{f.n++;if(f.n>=5){f.t=Date.now()+6e4;f.n=0}fails[u.id]=f;localStorage.mes_lock=JSON.stringify(fails);logEv('Błędne logowanie',u.name,u.name);saveLocal();$('authErr').textContent='Błędny PIN.'}}
 async function doPin(){const u=me(),n=$('pcN').value,e=await hp($('pcO').value,u.salt)!==u.hash?'Obecny PIN jest błędny.':weak(n)||(n!==$('pcN2').value?'PIN-y nie są identyczne.':'');if(e)return $('authErr').textContent=e;u.salt=newUid();u.hash=await hp(n,u.salt);u.must=false;u.updated=Date.now();logEv('Zmiana PIN-u');save();pinOpen=0;curView='';render()}
 function logout(auto){logEv(auto?'Wylogowanie (bezczynność)':'Wylogowanie');save();clearSess();pinOpen=0;curView='';render()}
+/* ===== KOREKTY STANU: osobny wpis z plusem lub minusem; zwykłych wpisów produkcyjnych nie zmienia ===== */
+state.corr=state.corr||[];
+(function(){
+ const o1=pack;pack=function(){const p=o1.apply(this,arguments);p.data.entries=[...state.entries,...state.corr];return p};
+ const o2=unpack;unpack=function(p){const u=o2(p),all=u.entries||[];u.entries=all.filter(e=>!(e&&e.kind==='corr'));u.corr=all.filter(e=>e&&e.kind==='corr');return u};
+ const o3=merge;merge=function(r){const de=new Set([...state.deletedEntries,...(r.deletedEntries||[])]),cm=new Map();[...state.corr,...(r.corr||[])].forEach(e=>{const x=cm.get(e.uid);if(!x||(+e.updated||0)>(+x.updated||0))cm.set(e.uid,e)});o3(r);state.corr=[...cm.values()].filter(e=>!de.has(e.uid)).sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(+a.created||0)-(+b.created||0))};
+ const o4=mergeChanged;mergeChanged=function(r){const b=JSON.stringify(state.corr),ch=o4(r);return ch||b!==JSON.stringify(state.corr)};
+ const o5=needPush;needPush=function(r){if(o5(r))return true;const ru=new Set((r.corr||[]).map(e=>e.uid));return state.corr.some(e=>!ru.has(e.uid))};
+ const o6=render;render=function(){o6.apply(this,arguments);try{if(me()&&can('correct')&&$('corr').classList.contains('show'))corrRefresh()}catch(e){console.error(e)}};
+})();
+const corrFmt=n=>{n=Math.round(+n||0);return(n>0?'+':n<0?'−':'')+Math.abs(n).toLocaleString('pl-PL')};
+function corrBuild(){
+ if($('corrForm'))return;
+ $('corr').innerHTML=`<div class="panel" id="corrForm"><h3>Korekta stanu · ${esc(CORR.name)}</h3><p class="hint">${CORR.hint}</p><div class="grid"><label>Zlecenie<select id="cOrder" onchange="corrSel()"></select></label><label>Korygowana wartość<select id="cField" onchange="corrSel()"></select></label><label>Stan wg systemu [szt.]<input id="cSys" readonly></label><label>Stan faktyczny [szt.]<input id="cCnt" type="number" min="0" step="1" inputmode="numeric" oninput="corrCalc()"></label><label>Korekta (różnica)<input id="cDelta" readonly></label><label>Powód<select id="cReason"><option>Inwentaryzacja</option><option>Błąd zliczenia</option><option>Pomyłka we wpisie</option><option>Inne</option></select></label><label>Uwaga (opcjonalnie)<input id="cNote" maxlength="200"></label></div><p id="cWarn" class="hint"></p><button onclick="corrAdd()">Zapisz korektę</button></div><div class="panel"><h3>Historia korekt</h3><div id="corrList"></div></div>`}
+function corrCur(){const o=$('cOrder').value,f=CORR.fields.find(x=>x.k===$('cField').value);return{o,f,sys:o&&f?Math.round(+f.sys(o)||0):0}}
+function corrCalc(){const{o,f,sys}=corrCur(),c=$('cCnt').value,has=c!==''&&isFinite(+c),d=has?Math.round(+c)-sys:0,w=has&&d!==0&&CORR.warn?(CORR.warn(o,f,d)||''):'';$('cSys').value=o?String(sys):'';$('cDelta').value=has?corrFmt(d):'';$('cWarn').textContent=w?'⚠ '+w:'';$('cWarn').style.color=w?'#c0392b':'';$('cWarn').style.fontWeight=w?'700':''}
+function corrSel(){$('cCnt').value='';corrCalc()}
+function corrRefresh(){
+ corrBuild();
+ const names=CORR.names(),sel=$('cOrder'),cur=sel.value,fs=$('cField');
+ sel.innerHTML=names.length?names.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join(''):'<option value="">— brak zleceń —</option>';
+ sel.value=names.includes(cur)?cur:(names[0]||'');
+ if(!fs.options.length)fs.innerHTML=CORR.fields.map(f=>`<option value="${f.k}">${esc(f.label)}</option>`).join('');
+ corrCalc();corrList()}
+function corrList(){
+ const L=[...state.corr].sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(+b.created||0)-(+a.created||0));
+ $('corrList').innerHTML=L.length?'<div style="overflow-x:auto"><table><tr><th>Data</th><th>Zlecenie</th><th>Wartość</th><th>System → faktycznie</th><th>Korekta</th><th>Powód</th><th>Uwaga</th><th>Kto</th><th></th></tr>'+L.map(e=>{const f=CORR.fields.find(x=>x.k===e.corr_field);return`<tr><td>${esc(e.date||'')}</td><td>${esc(CORR.orderOf(e)||'')}</td><td>${esc(f?f.label:(e.corr_field||''))}</td><td>${esc(e.corr_sys)} → ${esc(e.corr_cnt)}</td><td><b>${corrFmt(e[e.corr_field])}</b></td><td>${esc(e.corr_reason||'')}</td><td>${esc(e.notes||'')}</td><td>${esc(e.by||'')}</td><td>${can('correct')?`<button class="danger" onclick="corrDel('${esc(e.uid)}')">Usuń</button>`:''}</td></tr>`}).join('')+'</table></div>':'<p class="hint">Brak korekt.</p>'}
+function corrAdd(){
+ if(!can('correct'))return denied();
+ const{o,f,sys}=corrCur(),c=$('cCnt').value;
+ if(!o||!f)return alert('Wybierz zlecenie i korygowaną wartość.');
+ if(c===''||!isFinite(+c)||+c<0)return alert('Wpisz stan faktyczny (liczba 0 lub większa).');
+ const cnt=Math.round(+c),d=cnt-sys;
+ if(d===0)return alert('Stan faktyczny jest zgodny z systemem – korekta niepotrzebna.');
+ const w=CORR.warn?CORR.warn(o,f,d):'';
+ if(!confirm(`Zapisać korektę?\n\n${o} · ${f.label}\nstan w systemie: ${sys}\nstan faktyczny: ${cnt}\nkorekta: ${corrFmt(d)}`+(w?`\n\n⚠ ${w}`:'')))return;
+ const now=Date.now(),e={uid:newUid(),created:now,updated:now,kind:'corr',date:today(),by:me().name,corr_field:f.k,corr_sys:sys,corr_cnt:cnt,corr_reason:$('cReason').value,notes:$('cNote').value.trim(),...CORR.entry(o,f,d)};
+ state.corr.push(e);
+ logEv('Korekta stanu',`${o} · ${f.label}: ${sys} → ${cnt} (${corrFmt(d)}) · ${e.corr_reason}${e.notes?' · '+e.notes:''}`);
+ $('cCnt').value='';$('cNote').value='';save();render()}
+function corrDel(uid){
+ if(!can('correct'))return denied();
+ const e=state.corr.find(x=>x.uid===uid);if(!e)return;
+ if(!confirm('Usunąć tę korektę? Stan zlecenia wróci do wartości sprzed korekty.'))return;
+ state.corr=state.corr.filter(x=>x.uid!==uid);state.deletedEntries.push(uid);
+ logEv('Korekta stanu: usunięto',`${CORR.orderOf(e)||''} · ${e.corr_field}: ${corrFmt(e[e.corr_field])} (z ${e.date||''}, ${e.by||''})`);
+ save();render()}
+var CORR={name:'Etap 2 · Pakowanie',hint:'Księguje różnicę między liczbą spakowanych sztuk (lub braków) wg systemu a faktyczną. Dodaje osobny wpis z plusem lub minusem, bez zmiany zwykłych wpisów. Korekta „Spakowane” przesuwa też WIP 1 i WIP 2; korekta braków zmienia WIP 1.',
+ names:()=>{const M=model();return Object.values(M.ord).filter(o=>o.name&&o.name!=='?'&&(o.roll||o.packed||o.waste)).map(o=>o.name).sort((a,b)=>a.localeCompare(b,'pl'))},
+ fields:[{k:'packed',label:'Spakowane [szt.]',sys:n=>model().ord[n]?.packed||0},{k:'waste',label:'Braki pakowania [szt.]',sys:n=>model().ord[n]?.waste||0}],
+ orderOf:e=>e.src_order,
+ entry:(o,f,d)=>({src_order:o,src_uid:'',src_label:'Korekta stanu',[f.k]:d}),
+ warn:(n,f,d)=>{const o=model().ord[n];if(!o)return'';const p=o.packed+(f.k==='packed'?d:0),w=o.waste+(f.k==='waste'?d:0),t=[];if(o.roll-p-w<0)t.push('WIP 1 spadnie poniżej zera (spakowano by więcej rolek niż wykonano)');if(f.k==='packed'&&p-o.glued-o.rejected<0)t.push('WIP 2 spadnie poniżej zera (do klejenia pobrano by więcej niż spakowano)');return t.join('; ')}};
+
 /* ===== wspólne logowanie: jedna lista użytkowników (funkcja users-sync) i jedna sesja dla Etapów 1–3 ===== */
 var USERS_URL='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/users-sync',uVer=null,uBusy=false,uAt=0,uLast='';
 function sess(){try{const s=JSON.parse(localStorage.getItem('mes_session')||'null');return s&&s.id&&s.exp>Date.now()&&s.max>Date.now()?s:null}catch(e){return null}}
