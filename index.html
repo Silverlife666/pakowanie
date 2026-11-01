@@ -95,7 +95,7 @@ label.file input{display:none}
 <label>Spakowano [szt.]<input id="ePacked" type="number" min="0"></label><label>Odpady / braki [szt.]<input id="eWaste" type="number" min="0"></label><label id="eReasonBox">Przyczyna odpadu<select id="eReason"></select></label></div>
 <label>Uwagi<textarea id="eNotes"></textarea></label><button class="ok" onclick="saveEdit()">💾 Zapisz zmiany</button> <button onclick="cancelEdit()">Anuluj</button></div></div>
 <script>
-const APP_VERSION='1.8.0',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
+const APP_VERSION='1.9.0',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
 const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>ymd(new Date());
 const fdate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?m[3]+'.'+m[2]+'.'+m[1]:(d||'—')};
@@ -177,7 +177,7 @@ let synced=false,curView='',pinOpen=0,first=1,applyDef=true,fPage=100,editIndex=
 const ROLES={admin:'Administrator',owner:'Właściciel',operator:'Operator'},
 PERMS={admin:'entry.add entry.edit entry.delete order.manage summary export config data log override correct'.split(' '),owner:'entry.add entry.edit entry.delete order.manage summary export override correct'.split(' '),operator:['entry.add']},
 TABS={entry:'entry.add',orders:'entry.add',wip:'summary',summary:'summary',reasons:'summary',config:'config',data:'data',corr:'correct',log:'log'};
-const me=()=>state.users.find(u=>u.id===(sess()||{}).id),can=p=>!!me()&&PERMS[me().role].includes(p),denied=()=>alert('Brak uprawnień do tej operacji.');
+const me=()=>state.users.find(u=>u.id===(sess()||{}).id),can=p=>{const u=me();return !!u&&(Array.isArray(u.perms)?(u.perms.includes(p)||(u.role==='admin'&&p==='config')):PERMS[u.role].includes(p))},denied=()=>alert('Brak uprawnień do tej operacji.');
 const eDesc=x=>`${x.date} · ${x.src_order||'?'} · zm.${x.shift} · ${empList(x).join(', ')} · osób ${x.people} · spak. ${x.packed}, braki ${x.waste}`;
 function logEv(act,d,uname){const u=me();state.log.push({id:newUid(),ts:Date.now(),user:uname||(u?u.name:'—'),role:u?u.role:'',act,d:d||''});if(state.log.length>3000)state.log.splice(0,state.log.length-3000)}
 const enc=new TextEncoder();
@@ -300,7 +300,7 @@ setInterval(()=>{if(!document.hidden)syncUsers()},60000);
 function usersHtml(){return'<table><tr><th>Użytkownik</th><th>Rola</th><th></th></tr>'+state.users.map(u=>`<tr><td>${esc(u.name)}${u.must?' <span class="hint">(PIN tymczasowy)</span>':''}</td><td><select onchange="setRole('${u.id}',this.value)">${Object.entries(ROLES).map(([k,v])=>`<option value="${k}" ${k===u.role?'selected':''}>${v}</option>`).join('')}</select></td><td><button onclick="resetPin('${u.id}')">Reset PIN</button><button class="danger" onclick="delUser('${u.id}')">Usuń</button></td></tr>`).join('')+'</table>'}
 const nAdm=()=>state.users.filter(x=>x.role==='admin').length;
 async function addUser(){const n=$('nuN').value.trim(),p=$('nuP').value,r=$('nuR').value,e=!n?'Podaj nazwę.':state.users.some(u=>u.name.toLowerCase()===n.toLowerCase())?'Taki użytkownik już istnieje.':weak(p);if(e)return alert(e);state.users.push(await mkUser(n,r,p,true));logEv('Użytkownik: dodano',n+' ('+ROLES[r]+')');$('nuN').value=$('nuP').value='';save();render()}
-function setRole(id,r){const u=state.users.find(x=>x.id===id);if(u.role==='admin'&&r!=='admin'&&nAdm()<2){alert('Musi pozostać co najmniej jeden Administrator.');return render()}logEv('Użytkownik: zmiana roli',u.name+': '+ROLES[u.role]+' → '+ROLES[r]);u.role=r;u.updated=Date.now();save();render()}
+function setRole(id,r){const u=state.users.find(x=>x.id===id);if(u.role==='admin'&&r!=='admin'&&nAdm()<2){alert('Musi pozostać co najmniej jeden Administrator.');return render()}logEv('Użytkownik: zmiana roli',u.name+': '+ROLES[u.role]+' → '+ROLES[r]);u.role=r;delete u.perms;u.updated=Date.now();save();render()}
 async function resetPin(id){const u=state.users.find(x=>x.id===id),p=prompt('Nowy PIN tymczasowy dla '+u.name+' (4–8 cyfr):');if(p===null)return;const e=weak(p);if(e)return alert(e);u.salt=newUid();u.hash=await hp(p,u.salt);u.must=true;u.updated=Date.now();logEv('Użytkownik: reset PIN',u.name);save();render()}
 function delUser(id){const u=state.users.find(x=>x.id===id);if(u.id===me().id)return alert('Nie możesz usunąć własnego konta.');if(u.role==='admin'&&nAdm()<2)return alert('Musi pozostać co najmniej jeden Administrator.');if(!confirm('Usunąć użytkownika '+u.name+'?'))return;logEv('Użytkownik: usunięto',u.name);state.deletedUsers.push(u.id);state.users=state.users.filter(x=>x.id!==id);save();render()}
 
@@ -689,5 +689,35 @@ setInterval(()=>{if(!document.hidden&&me())refreshX()},60000);
 </script>
 <script>
 window.eReasonFill=function(cur){const l=(state.cfg.reasons||[]).slice();if(cur&&!l.includes(cur))l.push(cur);const s=$('eReason'),b=$('eReasonBox');b.style.display=l.length?'':'none';s.innerHTML='<option value="">— brak —</option>'+l.map(x=>`<option${x===cur?' selected':''}>${esc(x)}</option>`).join('')};
+</script>
+<script>
+/* ===== Uprawnienia szczegółowe (per użytkownik) ===== */
+(function(){
+ const ST='etap2';
+ const L={'entry.add':[ST==='etap2'?'Wpisy pakowania':'Wpisy produkcyjne','Dodawanie wpisów i podgląd historii'],'order.manage':['Zlecenia','Zarządzanie zleceniami'],'summary':['Podsumowania','Podsumowania, odpad wg przyczyn, zestawienia i raporty'],'remnants':['Resztki bobin','Podgląd i obsługa otwartych bobin'],'calc':['Kalkulator','Kalkulator prognoz'],'stock':['Magazyn bobin','Stan, dostawy i bilans zapotrzebowania'],'correct':['Korekty','Korekty stanu (zakładka Korekty)'],'data':['Import / eksport danych','Przenoszenie i kopie całych danych'],'log':['Log zdarzeń','Podgląd historii zmian'],'config':['Konfiguracja','Ustawienia, użytkownicy i uprawnienia'],'entry.edit':['Edycja wpisów','Poprawianie istniejących wpisów'],'entry.delete':['Usuwanie wpisów','Kasowanie wpisów'],'export':['Eksport i raporty PDF','Pobieranie raportów i eksportów'],'override':['Zapis mimo ostrzeżeń','Zatwierdzanie wpisów z ostrzeżeniem']};
+ const G1=['entry.add','order.manage','summary','remnants','calc','stock','correct','data','log','config'],G2=['entry.edit','entry.delete','export','override'];
+ const ALL=PERMS.admin.slice(),g1=G1.filter(p=>ALL.includes(p)),g2=G2.filter(p=>ALL.includes(p));
+ const DEP={'entry.edit':'entry.add','entry.delete':'entry.add','override':'entry.add','export':'summary'};
+ const eff=u=>new Set(Array.isArray(u.perms)?u.perms:PERMS[u.role]),open=new Set();
+ const css=document.createElement('style');css.textContent='.ptiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin:8px 0 12px}.ptile{text-align:left;padding:10px;border:1px solid rgba(128,128,128,.5);border-radius:8px;background:transparent;color:inherit;cursor:pointer;display:flex;flex-direction:column;gap:3px;font:inherit}.ptile.on{border-color:#2e9e6b;background:rgba(46,158,107,.14)}.ptile small{opacity:.75;font-size:12px}.ptile span{font-size:12px;font-weight:600}.ptile:disabled{opacity:.6;cursor:not-allowed}.ptile:focus-visible{outline:2px solid #5aa9e6;outline-offset:2px}';document.head.appendChild(css);
+ const up=$('usersBox')&&$('usersBox').closest('.panel');
+ if(up)up.insertAdjacentHTML('afterend','<div class="panel"><h3>Uprawnienia użytkowników</h3><p class="hint">Rozwiń użytkownika i klikaj kafelki, aby włączać lub wyłączać dostęp do widoków i operacji. Bez zmian obowiązują uprawnienia domyślne roli. Zmiana roli przywraca uprawnienia domyślne. Administrator zawsze ma dostęp do Konfiguracji. Włączenie edycji, usuwania lub eksportu włącza też widok, w którym te operacje są dostępne.</p><div id="permBox"></div></div>');
+ window.permOpenSet=(id,o)=>{o?open.add(id):open.delete(id)};
+ window.permToggle=function(id,p){
+  if(!can('config'))return denied();const u=state.users.find(x=>x.id===id);if(!u||(p==='config'&&u.role==='admin'))return;
+  const S=eff(u),on=S.has(p);
+  if(on){if(p==='config'&&!state.users.some(x=>x.id!==u.id&&(x.role==='admin'||eff(x).has('config'))))return alert('Musi pozostać co najmniej jeden użytkownik z dostępem do Konfiguracji.');
+   S.delete(p);Object.keys(DEP).forEach(d=>{if(DEP[d]===p)S.delete(d)})}
+  else{S.add(p);if(DEP[p]&&ALL.includes(DEP[p]))S.add(DEP[p])}
+  u.perms=ALL.filter(k=>S.has(k));u.updated=Date.now();
+  logEv('Użytkownik: uprawnienia',u.name+': '+(on?'wyłączono ':'włączono ')+L[p][0]);save();render()};
+ window.permReset=function(id){if(!can('config'))return denied();const u=state.users.find(x=>x.id===id);if(!u||!Array.isArray(u.perms))return;delete u.perms;u.updated=Date.now();logEv('Użytkownik: uprawnienia',u.name+': przywrócono domyślne dla roli');save();render()};
+ window.renderPerms=function(){
+  const b=$('permBox');if(!b||!can('config'))return;
+  const tile=(u,S)=>p=>{const on=S.has(p),lk=p==='config'&&u.role==='admin';return `<button type="button" class="ptile${on?' on':''}"${lk?' disabled':''} aria-pressed="${on}" onclick="permToggle('${u.id}','${p}')"><b>${esc(L[p][0])}</b><small>${esc(L[p][1])}</small><span>${lk?'zawsze (Administrator)':on?'✔ włączone':'wyłączone'}</span></button>`};
+  b.innerHTML=state.users.map(u=>{const S=eff(u),own=Array.isArray(u.perms),t=tile(u,S);
+   return `<details${open.has(u.id)?' open':''} ontoggle="permOpenSet('${u.id}',this.open)" style="margin:8px 0"><summary><b>${esc(u.name)}</b> · ${ROLES[u.role]} <span class="hint">· ${own?'uprawnienia własne':'domyślne dla roli'} (${[...S].filter(p=>ALL.includes(p)).length} z ${ALL.length})</span></summary><h4 style="margin:10px 0 0">Widoki</h4><div class="ptiles">${g1.map(t).join('')}</div><h4 style="margin:6px 0 0">Operacje</h4><div class="ptiles">${g2.map(t).join('')}</div>${own?`<button type="button" onclick="permReset('${u.id}')">↺ Przywróć domyślne dla roli</button>`:''}</details>`}).join('')};
+ const _r=render;render=function(){const r=_r.apply(this,arguments);try{const s=$('config');if(s&&s.classList.contains('show'))renderPerms()}catch(e){}return r};
+})();
 </script>
 </body></html>
