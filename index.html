@@ -95,7 +95,7 @@ label.file input{display:none}
 <label>Spakowano [szt.]<input id="ePacked" type="number" min="0"></label><label>Odpady / braki [szt.]<input id="eWaste" type="number" min="0"></label><label id="eReasonBox">Przyczyna odpadu<select id="eReason"></select></label></div>
 <label>Uwagi<textarea id="eNotes"></textarea></label><button class="ok" onclick="saveEdit()">💾 Zapisz zmiany</button> <button onclick="cancelEdit()">Anuluj</button></div></div>
 <script>
-const APP_VERSION='1.10.0',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
+const APP_VERSION='1.11.0',BASE='https://hjadatjvyrjexgmicggi.supabase.co/functions/v1/',API_URL=BASE+'pakowanie-sync',ROLL_URL=BASE+'bobbin-sync',GLUE_URL=BASE+'klejenie-sync',LS='pakowanieOffline',LSX='pakowanieWipCache';
 const $=id=>document.getElementById(id),esc=x=>String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const ymd=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'),today=()=>ymd(new Date());
 const fdate=d=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(d||'');return m?m[3]+'.'+m[2]+'.'+m[1]:(d||'—')};
@@ -109,7 +109,10 @@ const newUid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+M
 function hash(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeAt(i))|0;return(h>>>0).toString(36)}
 function ensureUid(e){if(!e.uid)e.uid='h'+hash(JSON.stringify(e));e.updated??=0;return e.uid}
 const stamp=()=>{const n=new Date(),p=v=>String(v).padStart(2,'0');return p(n.getHours())+':'+p(n.getMinutes())+' ('+p(n.getDate())+'.'+p(n.getMonth()+1)+')'};
-const setSync=t=>{$('sync').textContent='Status: '+t;$('last').textContent='Ostatnia zmiana: '+(state.lastModified||'—')};
+/* ===== Ostrzeżenie o niewysłanych zmianach (flaga w pamięci przeglądarki, żeby przetrwała zamknięcie karty) ===== */
+function mesUnsent(v){try{const k='mesUnsent_pakowanie';if(v===undefined)return localStorage.getItem(k)==='1';if(v)localStorage.setItem(k,'1');else localStorage.removeItem(k)}catch(e){return false}}
+addEventListener('beforeunload',e=>{if(mesUnsent()){e.preventDefault();e.returnValue='';return ''}});
+const setSync=t=>{if(/^(Zapisano w chmurze|Gotowy)/.test(t))mesUnsent(0);$('sync').textContent='Status: '+t+(mesUnsent()&&!/^(Zapisywanie|Pobieranie)/.test(t)?' · ⚠ niewysłane zmiany':'');$('last').textContent='Ostatnia zmiana: '+(state.lastModified||'—')};
 const sum=(a,k)=>a.reduce((s,x)=>s+(+x[k]||0),0),list=v=>v.split(',').map(x=>x.trim()).filter(Boolean);
 
 /* ===== synchronizacja z Supabase (funkcja pakowanie-sync) ===== */
@@ -139,7 +142,7 @@ function mergeChanged(r){const k=()=>JSON.stringify([state.entries,state.cfg,sta
 function needPush(r){const rl=new Set(r.log.map(l=>l.id)),rus=new Map(r.users.map(u=>[u.id,+u.updated||0])),ru=new Set(r.entries.map(ensureUid));
  return state.entries.some(e=>!ru.has(ensureUid(e)))||state.deletedEntries.some(u=>!r.deletedEntries.includes(u))||state.cfgUpdated>r.cfgUpdated||state.log.some(l=>!rl.has(l.id))||state.users.some(u=>(rus.get(u.id)??-1)<(+u.updated||0))||state.deletedUsers.some(i=>!r.deletedUsers.includes(i))}
 let busy=false,again=false;
-async function push(force){if(busy){again=true;return}busy=true;setSync('Zapisywanie w chmurze...');
+async function push(force){mesUnsent(1);if(busy){again=true;return}busy=true;setSync('Zapisywanie w chmurze...');
  try{if(!force){if(mergeChanged(await getCloud()))render()}
   /* zapis warunkowy (optimistic locking): serwer przyjmuje zapis tylko, gdy dokument nie zmienił się od ostatniego odczytu; przy konflikcie (409) pobieramy, scalamy i ponawiamy */
   let res,tries=0;
