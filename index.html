@@ -1,4 +1,4 @@
-<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pakowanie · Etap 2</title><style>
+<!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#103967"><link rel="manifest" href="../manifest.webmanifest"><link rel="icon" href="../icons/mes-icon.svg" type="image/svg+xml"><script>if('serviceWorker' in navigator)navigator.serviceWorker.register('../sw.js').catch(console.warn)</script><title>Pakowanie · Etap 2</title><style>
 
 :root{--navy:#123b69;--ink:#152238;--pale:#eef4fb;--line:#cbd8e6;--green:#16825d;--red:#ae3d3d}
 *{box-sizing:border-box}
@@ -623,7 +623,7 @@ setInterval(()=>{if(!document.hidden&&me())refreshX()},60000);
 /* ===== Pływający panel nawigacji MES (ten sam w Etapach 1–3) ===== */
 (function(){
  const CUR='pakowanie',KEY='mesNavUrls',OPEN='mesNavOpen',
- ST=[{id:'bobbin',n:1,name:'Rolsiarka',ico:'🌀',def:'https://silverlife666.github.io/Bobina/'},{id:'pakowanie',n:2,name:'Pakowanie',ico:'📦',def:'https://silverlife666.github.io/pakowanie/'},{id:'klejenie',n:3,name:'Klejenie',ico:'🧴',def:'https://silverlife666.github.io/klejenie/'},{id:'hala',n:0,name:'Hala (przegląd zleceń)',ico:'🏭',def:'https://silverlife666.github.io/hala/'}],
+ ST=[{id:'bobbin',n:1,name:'Rolsiarka',ico:'🌀',def:'https://silverlife666.github.io/Bobina/'},{id:'pakowanie',n:2,name:'Pakowanie',ico:'📦',def:'https://silverlife666.github.io/pakowanie/'},{id:'klejenie',n:3,name:'Klejenie',ico:'🧴',def:'https://silverlife666.github.io/klejenie/'},{id:'hala',n:0,name:'Hala (przegląd zleceń)',ico:'🏭',def:'https://silverlife666.github.io/hala/'},{id:'karta',n:0,name:'Karta pracy',ico:'🗒️',def:'https://silverlife666.github.io/karta/'}],
  esc=x=>String(x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  let U={};try{U=JSON.parse(localStorage.getItem(KEY)||'{}')||{}}catch(e){}
  let open=(()=>{try{const v=localStorage.getItem(OPEN);return v===null?innerWidth>900:v==='1'}catch(e){return true}})();
